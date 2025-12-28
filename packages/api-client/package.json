@@ -1,0 +1,26 @@
+{
+  "name": "@vikunja/api-client",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "echo 'This package is not directly executable'",
+    "dev": "tsc --watch",
+    "test": "vitest run --passWithNoTests",
+    "lint": "biome check src",
+    "gen:client": "orval"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "camelcase-keys": "^9.0.0",
+    "snakecase-keys": "^5.0.0"
+  },
+  "devDependencies": {
+    "faker": "^6.6.6",
+    "orval": "^7.17.2"
+  }
+}

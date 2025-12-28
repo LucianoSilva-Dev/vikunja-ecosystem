@@ -1,0 +1,17 @@
+{
+  "name": "vikunja-mcp-server",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --experimental-strip-types --watch src/index.ts",
+    "test": "vitest run --passWithNoTests",
+    "lint": "biome check src"
+  },
+  "dependencies": {
+    "@vikunja/api-client": "workspace:*",
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "dotenv": "^16.3.1"
+  }
+}

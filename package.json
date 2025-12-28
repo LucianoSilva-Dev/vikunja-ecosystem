@@ -1,0 +1,22 @@
+{
+  "name": "vikunja-ecosystem",
+  "version": "1.0.0",
+  "description": "Vikunja Ecosystem (Bot, MCP, Shared Libs)",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "start": "pnpm -r run start",
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r run dev",
+    "test": "pnpm -r run test",
+    "lint": "pnpm -r run lint"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.10.3",
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.8"
+  }
+}
