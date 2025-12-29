@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "start": "echo 'This package is not directly executable'",
-    "dev": "tsc --watch",
+    "dev": "tsx --watch src/index.ts",
     "test": "vitest run --passWithNoTests",
     "lint": "biome check src",
     "gen:client": "orval"
