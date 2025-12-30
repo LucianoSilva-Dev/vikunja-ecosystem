@@ -1,6 +1,7 @@
 import type { Client } from 'discord.js';
 import type { ILogger } from '../../shared/types';
 import { registerReadyEvent } from './ready.event';
+import { registerInteractionEvent } from './interaction.event';
 
 export interface EventsDeps {
   logger: ILogger;
@@ -11,6 +12,7 @@ export interface EventsDeps {
  */
 export function registerEvents(client: Client, deps: EventsDeps): void {
   registerReadyEvent(client, deps);
+  registerInteractionEvent(client, deps);
 
   deps.logger.debug('All Discord events registered');
 }

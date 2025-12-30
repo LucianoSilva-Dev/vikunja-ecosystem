@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import type { ILogger } from '../shared/types';
 import { registerEvents } from './events';
 
@@ -17,7 +17,10 @@ export function createDiscordClient(deps: DiscordClientDeps): Client {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.MessageContent,
+      GatewayIntentBits.DirectMessages,
+      GatewayIntentBits.DirectMessageReactions,
     ],
+    partials: [Partials.Channel, Partials.Message],
   });
 
   // Register all events
