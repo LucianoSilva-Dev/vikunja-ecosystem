@@ -14,7 +14,12 @@ export const envSchema = z.object({
   VIKUNJA_API_TOKEN: z.string().min(1, 'VIKUNJA_API_TOKEN is required'),
   VIKUNJA_WEBHOOK_SECRET: z.string().min(1, 'VIKUNJA_WEBHOOK_SECRET is required'),
 
+  // Database
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+
   // Optional
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
+
+export type Env = z.infer<typeof envSchema>;
