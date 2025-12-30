@@ -1,5 +1,4 @@
 import dotenv from 'dotenv';
-
 // Load .env file before anything else
 dotenv.config();
 
@@ -7,7 +6,7 @@ import { createApp } from './app';
 import { getDiscordConfig, getHttpConfig } from './shared/config';
 
 async function bootstrap() {
-  const app = createApp();
+  const app = await createApp();
   const { logger, discordClient, httpServer } = app;
 
   const discordConfig = getDiscordConfig();
@@ -22,8 +21,16 @@ async function bootstrap() {
     await httpServer.listen({
       port: httpConfig.port,
       host: httpConfig.host,
+    }, (err, address) => {
+      if (err) {
+        logger.error('Failed to start HTTP server', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        process.exit(1);
+      }
+      logger.info(`HTTP server listening on ${address}`);
     });
-    logger.info(`HTTP server listening on ${httpConfig.host}:${httpConfig.port}`);
+    
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {

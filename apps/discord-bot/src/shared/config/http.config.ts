@@ -1,4 +1,4 @@
-import { getEnv } from './env';
+import { getEnv } from '../env';
 
 export interface HttpConfig {
   port: number;

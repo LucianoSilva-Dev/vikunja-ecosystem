@@ -1,14 +1,9 @@
-import type { FastifyInstance } from 'fastify';
-import type { Client } from 'discord.js';
-
 import {
   loadEnv,
-  getDiscordConfig,
-  getHttpConfig,
   getVikunjaConfig,
 } from './shared/config';
 import { createLogger } from './shared/logger';
-import type { ILogger, AppContainer } from './shared/types';
+import type { AppContainer } from './shared/types';
 import { createHttpServer } from './http/server';
 import { createDiscordClient } from './bot/client';
 import {
@@ -32,7 +27,7 @@ export interface App extends AppContainer {
  * Creates the application container with all dependencies
  * This is the Composition Root - the single place where all dependencies are wired together
  */
-export function createApp(): App {
+export async function createApp(): Promise<App> {
   // Load and validate environment first
   loadEnv();
 
@@ -52,8 +47,8 @@ export function createApp(): App {
   // Create Discord client
   const discordClient = createDiscordClient({ logger });
 
-  // Create HTTP server
-  const httpServer = createHttpServer({ logger });
+  // Create HTTP server (async due to plugin registration)
+  const httpServer = await createHttpServer({ logger });
 
   logger.info('Application container created');
 
