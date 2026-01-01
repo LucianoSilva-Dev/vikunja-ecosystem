@@ -1,4 +1,4 @@
-import type { Client } from 'discord.js';
+import { type Client, Events, ActivityType } from 'discord.js';
 import type { ILogger } from '../../shared/types';
 
 export interface ReadyEventDeps {
@@ -14,10 +14,20 @@ export function registerReadyEvent(
 ): void {
   const { logger } = deps;
 
-  client.once('ready', (readyClient) => {
+  client.once(Events.ClientReady, (readyClient) => {
     logger.info('Discord bot is ready!', {
       username: readyClient.user.tag,
       guilds: readyClient.guilds.cache.size,
+    });
+
+    readyClient.user.setPresence({
+      status: 'online',
+      activities: [
+        {
+          name: 'Vikunja Projects',
+          type: ActivityType.Watching,
+        },
+      ],
     });
   });
 }

@@ -1,11 +1,15 @@
 import {
   loadEnv,
   getVikunjaConfig,
+  getDatabaseConfig,
 } from './shared/config';
 import { createLogger } from './shared/logger';
 import type { AppContainer } from './shared/types';
 import { createHttpServer } from './http/server';
 import { createDiscordClient } from './bot/client';
+import { createDatabase } from './db';
+import { ConfigurationRepository } from './shared/repositories/configuration.repository';
+import { VikunjaApiService } from './shared/services/vikunja-api.service';
 import {
   createNotificationService,
   type NotificationService,
@@ -33,9 +37,19 @@ export async function createApp(): Promise<App> {
 
   // Get configs
   const vikunjaConfig = getVikunjaConfig();
+  const dbConfig = getDatabaseConfig();
 
   // Create core dependencies
   const logger = createLogger();
+  const { db } = createDatabase(dbConfig.url);
+
+  // Create shared services
+  const configRepository = new ConfigurationRepository({ logger, db });
+  const vikunjaApiService = new VikunjaApiService({
+    logger,
+    apiUrl: vikunjaConfig.apiUrl,
+    apiToken: vikunjaConfig.apiToken,
+  });
 
   // Create services
   const notificationService = createNotificationService({ logger });
@@ -45,7 +59,11 @@ export async function createApp(): Promise<App> {
   });
 
   // Create Discord client
-  const discordClient = createDiscordClient({ logger });
+  const discordClient = createDiscordClient({
+    logger,
+    configRepository,
+    vikunjaApiService,
+  });
 
   // Create HTTP server (async due to plugin registration)
   const httpServer = await createHttpServer({ logger });

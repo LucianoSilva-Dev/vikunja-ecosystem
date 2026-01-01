@@ -1,10 +1,19 @@
 import type { Client, Interaction, SlashCommandBuilder, SlashCommandSubcommandsOnlyBuilder } from 'discord.js';
+import type { ILogger } from '../../shared/types';
+import type { ConfigurationRepository } from '../../shared/repositories/configuration.repository';
+import type { VikunjaApiService } from '../../shared/services/vikunja-api.service';
+
+export interface BotServices {
+  logger: ILogger;
+  configRepository: ConfigurationRepository;
+  vikunjaApiService: VikunjaApiService;
+}
 
 export interface CommandHandler {
   name: string;
   description: string;
   data?: SlashCommandBuilder | SlashCommandSubcommandsOnlyBuilder;
-  execute: (interaction: Interaction) => Promise<void>;
+  execute: (interaction: Interaction, services: BotServices) => Promise<void>;
 }
 
 export interface BotEventHandler {
@@ -14,5 +23,7 @@ export interface BotEventHandler {
 }
 
 export interface DiscordClientDeps {
-  // Will be expanded with services later
+  logger: ILogger;
+  configRepository: ConfigurationRepository;
+  vikunjaApiService: VikunjaApiService;
 }

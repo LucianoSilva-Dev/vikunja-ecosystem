@@ -1,11 +1,9 @@
 import type { Client } from 'discord.js';
-import type { ILogger } from '../../shared/types';
+import type { InteractionEventDeps } from './interaction.event';
 import { registerReadyEvent } from './ready.event';
 import { registerInteractionEvent } from './interaction.event';
 
-export interface EventsDeps {
-  logger: ILogger;
-}
+export interface EventsDeps extends InteractionEventDeps {}
 
 /**
  * Registers all Discord event handlers
