@@ -1,11 +1,11 @@
 import { eq, and } from 'drizzle-orm';
-import type { Database } from '../../db';
+import type { Database } from '../../core/database';
 import {
   dmConfigurations,
   dmProjectBindings,
   guildConfigurations,
   guildChannelBindings,
-} from '../../db/schema';
+} from '../../core/database/schema';
 import type { ILogger } from '../types';
 
 export interface ConfigurationRepositoryDeps {
