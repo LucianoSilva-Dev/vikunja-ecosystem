@@ -15,7 +15,7 @@ export interface HttpServerDeps {
   logger: ILogger;
 }
 
-export interface RouteRegistrar {
+export interface RouteRegister {
   (server: FastifyInstance, deps: { logger: ILogger }): void;
 }
 
@@ -24,7 +24,7 @@ export interface RouteRegistrar {
  */
 export async function createHttpServer(
   deps: HttpServerDeps,
-  routeRegistrars: RouteRegistrar[] = []
+  routeRegisters: RouteRegister[] = []
 ): Promise<FastifyInstance> {
   const { logger } = deps;
 
@@ -66,9 +66,9 @@ export async function createHttpServer(
     }
   );
 
-  // Register all provided route registrars
-  for (const registrar of routeRegistrars) {
-    registrar(server, { logger });
+  // Register all provided route registers
+  for (const register of routeRegisters) {
+    register(server, { logger });
   }
 
   // Error handler

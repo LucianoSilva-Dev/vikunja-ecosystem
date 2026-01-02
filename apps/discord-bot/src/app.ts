@@ -9,7 +9,7 @@ import type { ILogger } from './shared/types';
 import { createLogger } from './core/logger';
 import { createDatabase, type Database } from './core/database';
 import { createDiscordClient, registerReadyEvent, type Client } from './core/discord';
-import { createHttpServer, type FastifyInstance, type RouteRegistrar } from './core/http';
+import { createHttpServer, type FastifyInstance, type RouteRegister } from './core/http';
 
 // Shared services
 import { ConfigurationRepository } from './shared/repositories/configuration.repository';
@@ -38,7 +38,7 @@ import {
   REMOVE_PROJECT_CUSTOM_IDS,
 } from './features/projects';
 import { NotificationService } from './features/notifications';
-import { WebhookService, createWebhookRoutes } from './features/webhook';
+import { WebhookService, createWebhookRoutes, createTestWebhookRoutes } from './features/webhook';
 
 /**
  * Application container with all services
@@ -118,8 +118,8 @@ export async function createApp(): Promise<App> {
     projectsService,
   });
 
-  // Create route registrars for HTTP server
-  const webhookRouteRegistrar = createWebhookRoutes({
+  // Create route registers for HTTP server
+  const webhookRouteRegister = createWebhookRoutes({
     logger,
     onWebhookReceived: async (rawPayload, signature) => {
       const event = await webhookService.processWebhook(rawPayload, signature);
@@ -147,8 +147,37 @@ export async function createApp(): Promise<App> {
     },
   });
 
-  // Create HTTP server with route registrars
-  const httpServer = await createHttpServer({ logger }, [webhookRouteRegistrar]);
+  // Create test webhook route register (only active in development)
+  const testWebhookRouteRegister = createTestWebhookRoutes({
+    logger,
+    onTestEvent: async (event) => {
+      // Find targets and send notifications (bypasses signature validation)
+      const targets = await configRepository.findNotificationTargets(
+        event.data.type === 'task' ? event.data.projectId : event.data.id
+      );
+
+      for (const target of targets) {
+        const payload = {
+          eventType: event.eventType,
+          title: event.data.title,
+          description: event.data.description,
+          timestamp: event.timestamp,
+        };
+
+        if (target.type === 'dm') {
+          await notificationService.sendToDm(discordClient, target.targetId, payload);
+        } else {
+          await notificationService.sendToChannel(discordClient, target.targetId, payload);
+        }
+      }
+    },
+  });
+
+  // Create HTTP server with route registers
+  const httpServer = await createHttpServer({ logger }, [
+    webhookRouteRegister,
+    testWebhookRouteRegister,
+  ]);
 
   logger.info('Application container created');
 
