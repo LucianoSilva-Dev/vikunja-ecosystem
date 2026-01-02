@@ -2,6 +2,7 @@ import {
   SlashCommandBuilder,
   ApplicationIntegrationType,
   InteractionContextType,
+  ChannelType,
 } from 'discord.js';
 
 /**
@@ -23,18 +24,19 @@ export const projectsCommandData = new SlashCommandBuilder()
     sub.setName('list').setDescription('Listar projetos configurados')
   )
   .addSubcommand((sub) =>
-    sub.setName('add').setDescription('Adicionar um novo projeto')
+    sub
+      .setName('add')
+      .setDescription('Adicionar um novo projeto')
+      .addChannelOption((opt) =>
+        opt
+          .setName('channel')
+          .setDescription('Canal para associar ao projeto (apenas em servidores)')
+          .addChannelTypes(ChannelType.GuildText)
+          .setRequired(false)
+      )
   )
   .addSubcommand((sub) =>
-    sub
-      .setName('remove')
-      .setDescription('Remover um projeto')
-      .addIntegerOption((opt) =>
-        opt
-          .setName('project_id')
-          .setDescription('ID do projeto a remover')
-          .setRequired(true)
-      )
+    sub.setName('remove').setDescription('Remover um projeto')
   );
 
 export const PROJECTS_COMMAND_NAME = 'projects';

@@ -1,6 +1,5 @@
 import {
   SlashCommandBuilder,
-  ChannelType,
   ApplicationIntegrationType,
   InteractionContextType,
 } from 'discord.js';
@@ -25,18 +24,6 @@ export const setupCommandData = new SlashCommandBuilder()
     sub
       .setName('dm')
       .setDescription('Configurar para receber notificações na sua DM')
-  )
-  .addSubcommand((sub) =>
-    sub
-      .setName('guild')
-      .setDescription('Configurar para este servidor')
-      .addChannelOption((opt) =>
-        opt
-          .setName('channel')
-          .setDescription('Canal para receber notificações')
-          .addChannelTypes(ChannelType.GuildText)
-          .setRequired(true)
-      )
   );
 
 export const SETUP_COMMAND_NAME = 'setup';

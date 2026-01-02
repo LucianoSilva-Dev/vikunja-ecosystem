@@ -19,7 +19,6 @@ import { VikunjaApiService } from './shared/services/vikunja-api.service';
 import {
   SetupService,
   handleSetupDm,
-  handleSetupGuild,
   handleSetupDmSelect,
   setupCommandData,
   SETUP_COMMAND_NAME,
@@ -28,9 +27,15 @@ import {
   ProjectsService,
   handleListProjects,
   handleAddProject,
+  handleAddProjectSelect,
+  handleAddChannelSelect,
   handleRemoveProject,
+  handleRemoveChannelSelect,
+  handleRemoveProjectSelect,
   projectsCommandData,
   PROJECTS_COMMAND_NAME,
+  ADD_PROJECT_CUSTOM_IDS,
+  REMOVE_PROJECT_CUSTOM_IDS,
 } from './features/projects';
 import { NotificationService } from './features/notifications';
 import { WebhookService, createWebhookRoutes } from './features/webhook';
@@ -192,8 +197,6 @@ function registerInteractionHandler(
 
           if (subcommand === 'dm') {
             await handleSetupDm(interaction, { logger, setupService });
-          } else if (subcommand === 'guild') {
-            await handleSetupGuild(interaction, { logger });
           }
         } else if (commandName === PROJECTS_COMMAND_NAME) {
           const subcommand = interaction.options.getSubcommand();
@@ -201,7 +204,7 @@ function registerInteractionHandler(
           if (subcommand === 'list') {
             await handleListProjects(interaction, { logger, projectsService });
           } else if (subcommand === 'add') {
-            await handleAddProject(interaction);
+            await handleAddProject(interaction, { logger, projectsService });
           } else if (subcommand === 'remove') {
             await handleRemoveProject(interaction, { logger, projectsService });
           }
@@ -212,8 +215,22 @@ function registerInteractionHandler(
           });
         }
       } else if (interaction.isStringSelectMenu()) {
-        if (interaction.customId === 'setup_dm_project_select') {
+        const customId = interaction.customId;
+
+        if (customId === 'setup_dm_project_select') {
           await handleSetupDmSelect(interaction, { logger, setupService });
+        } else if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.PROJECT_SELECT)) {
+          await handleAddProjectSelect(interaction, { logger, projectsService });
+        } else if (customId === REMOVE_PROJECT_CUSTOM_IDS.CHANNEL_SELECT) {
+          await handleRemoveChannelSelect(interaction, { logger, projectsService });
+        } else if (customId === REMOVE_PROJECT_CUSTOM_IDS.PROJECT_SELECT) {
+          await handleRemoveProjectSelect(interaction, { logger, projectsService });
+        }
+      } else if (interaction.isChannelSelectMenu()) {
+        const customId = interaction.customId;
+
+        if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.CHANNEL_SELECT)) {
+          await handleAddChannelSelect(interaction, { logger, projectsService });
         }
       }
     } catch (error) {

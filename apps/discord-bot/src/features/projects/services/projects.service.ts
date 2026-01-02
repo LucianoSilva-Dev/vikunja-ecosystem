@@ -112,6 +112,94 @@ export class ProjectsService {
       };
     }
   }
+
+  // ============ Guild Operations ============
+
+  /**
+   * Add a project to a guild channel
+   */
+  async addProjectToChannel(
+    guildId: string,
+    channelId: string,
+    projectId: number
+  ): Promise<ProjectsResult<void>> {
+    try {
+      const project = await this.vikunjaApiService.getProject(projectId);
+
+      if (!project) {
+        return { success: false, error: 'Projeto não encontrado.' };
+      }
+
+      await this.configRepository.addChannelBinding(guildId, channelId, {
+        projectId,
+        projectName: project.title || `Project ${projectId}`,
+        webhookEvents: [],
+      });
+
+      this.logger.info('Project added to channel', { guildId, channelId, projectId });
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Failed to add project to channel', {
+        guildId,
+        channelId,
+        projectId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { success: false, error: 'Erro ao adicionar projeto ao canal.' };
+    }
+  }
+
+  /**
+   * Remove a project from a guild channel
+   */
+  async removeProjectFromChannel(
+    guildId: string,
+    channelId: string
+  ): Promise<ProjectsResult<void>> {
+    try {
+      await this.configRepository.removeChannelBinding(guildId, channelId);
+      this.logger.info('Project removed from channel', { guildId, channelId });
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Failed to remove project from channel', {
+        guildId,
+        channelId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { success: false, error: 'Erro ao remover projeto do canal.' };
+    }
+  }
+
+  /**
+   * Get the project associated with a channel
+   */
+  async getProjectByChannel(
+    guildId: string,
+    channelId: string
+  ): Promise<ProjectsResult<{ projectId: number; projectName: string } | null>> {
+    try {
+      const binding = await this.configRepository.getChannelBinding(guildId, channelId);
+      
+      if (!binding) {
+        return { success: true, data: null };
+      }
+
+      return {
+        success: true,
+        data: {
+          projectId: binding.projectId,
+          projectName: binding.projectName,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Failed to get project by channel', {
+        guildId,
+        channelId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { success: false, error: 'Erro ao buscar projeto do canal.' };
+    }
+  }
 }
 
 export function createProjectsService(deps: ProjectsServiceDeps): ProjectsService {

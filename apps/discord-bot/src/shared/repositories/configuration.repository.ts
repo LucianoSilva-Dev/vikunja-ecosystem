@@ -217,6 +217,21 @@ export class ConfigurationRepository {
     return config.channelBindings;
   }
 
+  /**
+   * Busca o binding de um canal específico
+   */
+  async getChannelBinding(guildId: string, channelId: string) {
+    const config = await this.getGuildConfiguration(guildId);
+    if (!config) return null;
+
+    return this.db.query.guildChannelBindings.findFirst({
+      where: and(
+        eq(guildChannelBindings.guildConfigId, config.id),
+        eq(guildChannelBindings.channelId, channelId)
+      ),
+    });
+  }
+
   // ============ Query Operations ============
 
   /**
