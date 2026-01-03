@@ -55,6 +55,13 @@ import {
   createWebhookRoutes,
   createTestWebhookRoutes,
 } from './features/webhook';
+import {
+  AuthService,
+  AuthCommand,
+  AuthInteractionHandler,
+  CONNECT_ACCOUNT_COMMAND_NAME,
+  DISCONNECT_ACCOUNT_COMMAND_NAME,
+} from './features/auth';
 import type {
   VikunjaTask,
   VikunjaProject,
@@ -79,6 +86,7 @@ export interface App {
   webhookService: WebhookService;
   webhookRegistrationService: WebhookRegistrationService;
   payloadBuilder: NotificationPayloadBuilder;
+  authService: AuthService;
 }
 
 /**
@@ -145,6 +153,15 @@ export async function createApp(): Promise<App> {
     vikunjaApiService,
   });
 
+  const authService = new AuthService({
+    logger,
+    userMappingRepository,
+    vikunjaApiService,
+  });
+
+  const authCommand = new AuthCommand(logger, authService);
+  const authInteractionHandler = new AuthInteractionHandler(logger, authService);
+
   // Create Discord client
   const discordClient = createDiscordClient();
 
@@ -156,6 +173,8 @@ export async function createApp(): Promise<App> {
     logger,
     setupService,
     projectsService,
+    authCommand,
+    authInteractionHandler,
   });
 
   // Helper to extract projectId from event (for routing)
@@ -303,6 +322,7 @@ export async function createApp(): Promise<App> {
     webhookService,
     webhookRegistrationService,
     payloadBuilder,
+    authService,
   };
 }
 
@@ -310,7 +330,10 @@ export async function createApp(): Promise<App> {
  * Get all command data for deployment
  */
 export function getCommandsData() {
-  return [setupCommandData, projectsCommandData];
+  const logger = createLogger({ name: 'temp-command-loader', level: 'info' }); // Temporary logger just for definition
+  // Mock AuthService for command definition extraction
+  const authCommand = new AuthCommand(logger, {} as AuthService);
+  return [setupCommandData, projectsCommandData, ...authCommand.definitions];
 }
 
 // ============ Internal Helpers ============
@@ -319,13 +342,15 @@ interface InteractionHandlerDeps {
   logger: ILogger;
   setupService: SetupService;
   projectsService: ProjectsService;
+  authCommand: AuthCommand;
+  authInteractionHandler: AuthInteractionHandler;
 }
 
 function registerInteractionHandler(
   client: Client,
   deps: InteractionHandlerDeps
 ): void {
-  const { logger, setupService, projectsService } = deps;
+  const { logger, setupService, projectsService, authCommand, authInteractionHandler } = deps;
 
   client.on('interactionCreate', async (interaction) => {
     try {
@@ -353,6 +378,11 @@ function registerInteractionHandler(
             content: '🏓 Pong! Bot está funcionando.',
             ephemeral: true,
           });
+        } else if (
+          commandName === CONNECT_ACCOUNT_COMMAND_NAME ||
+          commandName === DISCONNECT_ACCOUNT_COMMAND_NAME
+        ) {
+          await authCommand.handle(interaction);
         }
       } else if (interaction.isStringSelectMenu()) {
         const customId = interaction.customId;
@@ -384,6 +414,8 @@ function registerInteractionHandler(
             projectsService,
           });
         }
+      } else if (interaction.isModalSubmit()) {
+        await authInteractionHandler.handleModalSubmit(interaction);
       }
     } catch (error) {
       logger.error('Interaction failed', {

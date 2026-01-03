@@ -9,6 +9,18 @@ import {
 import { relations } from 'drizzle-orm';
 
 /**
+ * Mapeamento de usuários Vikunja <-> Discord
+ */
+export const userMappings = pgTable('user_mappings', {
+  id: serial('id').primaryKey(),
+  vikunjaUserId: integer('vikunja_user_id').notNull().unique(),
+  vikunjaUsername: text('vikunja_username').notNull(),
+  discordUserId: text('discord_user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+/**
  * Configurações de DM (1 por usuário Discord)
  */
 export const dmConfigurations = pgTable('dm_configurations', {

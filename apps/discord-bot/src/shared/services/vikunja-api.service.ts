@@ -6,7 +6,10 @@ import {
   deleteProjectsIdWebhooksWebhookID,
   type ModelsProject,
   type ModelsWebhook,
+  postLogin,
+  getUser,
 } from '@vikunja/api-client';
+import { VikunjaUser } from '../types/vikunja.types';
 import type { ILogger } from '../types';
 
 export type VikunjaProject = ModelsProject;
@@ -178,6 +181,47 @@ export class VikunjaApiService {
         error: error instanceof Error ? error.message : String(error),
       });
       return null;
+    }
+  }
+  /**
+   * Autentica um usuário e retorna o token JWT
+   */
+  async authenticate(username: string, password: string): Promise<string> {
+    this.logger.debug('Authenticating user', { username });
+    try {
+      const response = await postLogin({
+        username,
+        password,
+      }, { baseURL: this.apiUrl }); // Login uses base URL, no auth header needed yet
+      
+      // The response is usually { token: "..." }
+      // Checked against common Vikunja API structure
+      return (response as any).token;
+    } catch (error) {
+      this.logger.warn('Authentication failed', {
+        username,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Retorna os dados do usuário autenticado pelo token
+   */
+  async getCurrentUser(token: string): Promise<VikunjaUser> {
+    this.logger.debug('Fetching current user info');
+    try {
+      const response = await getUser({
+        baseURL: this.apiUrl,
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      return response as unknown as VikunjaUser;
+    } catch (error) {
+       this.logger.error('Failed to get current user', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
     }
   }
 }
