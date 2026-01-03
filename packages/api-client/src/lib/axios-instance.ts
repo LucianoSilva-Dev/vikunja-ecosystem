@@ -67,9 +67,17 @@ AXIOS_INSTANCE.interceptors.request.use((config) => {
 
 export const customInstance = <T>(config: any, options?: any): Promise<T> => {
   const source = axios.CancelToken.source();
+  
+  // Merge headers properly instead of overwriting
+  const mergedHeaders = {
+    ...config.headers,
+    ...options?.headers,
+  };
+  
   const promise = AXIOS_INSTANCE({
     ...config,
     ...options,
+    headers: mergedHeaders,
     cancelToken: source.token,
   }).then(({ data }) => data);
 

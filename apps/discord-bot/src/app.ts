@@ -38,7 +38,7 @@ import {
   REMOVE_PROJECT_CUSTOM_IDS,
 } from './features/projects';
 import { NotificationService } from './features/notifications';
-import { WebhookService, createWebhookRoutes, createTestWebhookRoutes } from './features/webhook';
+import { WebhookService, WebhookRegistrationService, createWebhookRoutes, createTestWebhookRoutes } from './features/webhook';
 import { VikunjaTask, VikunjaProject, VikunjaUser } from './shared/types/vikunja.types';
 
 /**
@@ -57,6 +57,7 @@ export interface App {
   projectsService: ProjectsService;
   notificationService: NotificationService;
   webhookService: WebhookService;
+  webhookRegistrationService: WebhookRegistrationService;
 }
 
 /**
@@ -87,16 +88,25 @@ export async function createApp(): Promise<App> {
   });
 
   // Create feature services
+  const webhookRegistrationService = new WebhookRegistrationService({
+    logger,
+    vikunjaApiService,
+    webhookCallbackUrl: vikunjaConfig.webhookCallbackUrl,
+    webhookSecret: vikunjaConfig.webhookSecret,
+  });
+
   const setupService = new SetupService({
     logger,
     configRepository,
     vikunjaApiService,
+    webhookRegistrationService,
   });
 
   const projectsService = new ProjectsService({
     logger,
     configRepository,
     vikunjaApiService,
+    webhookRegistrationService,
   });
 
   const notificationService = new NotificationService({ logger });
@@ -252,6 +262,7 @@ export async function createApp(): Promise<App> {
     projectsService,
     notificationService,
     webhookService,
+    webhookRegistrationService,
   };
 }
 

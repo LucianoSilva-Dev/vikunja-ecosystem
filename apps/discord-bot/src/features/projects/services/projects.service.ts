@@ -1,11 +1,13 @@
 import type { ILogger } from '../../../shared/types';
 import type { ConfigurationRepository } from '../../../shared/repositories/configuration.repository';
 import type { VikunjaApiService, VikunjaProject } from '../../../shared/services/vikunja-api.service';
+import type { WebhookRegistrationService } from '../../webhook/services/webhook-registration.service';
 
 export interface ProjectsServiceDeps {
   logger: ILogger;
   configRepository: ConfigurationRepository;
   vikunjaApiService: VikunjaApiService;
+  webhookRegistrationService?: WebhookRegistrationService;
 }
 
 export interface ProjectsResult<T> {
@@ -21,11 +23,13 @@ export class ProjectsService {
   private readonly logger: ILogger;
   private readonly configRepository: ConfigurationRepository;
   private readonly vikunjaApiService: VikunjaApiService;
+  private readonly webhookRegistrationService?: WebhookRegistrationService;
 
   constructor(deps: ProjectsServiceDeps) {
     this.logger = deps.logger;
     this.configRepository = deps.configRepository;
     this.vikunjaApiService = deps.vikunjaApiService;
+    this.webhookRegistrationService = deps.webhookRegistrationService;
   }
 
   /**
@@ -61,6 +65,9 @@ export class ProjectsService {
         projectName: project.title || `Project ${projectId}`,
         webhookEvents: [],
       });
+
+      // Register webhook in Vikunja
+      await this.webhookRegistrationService?.ensureWebhookRegistered(projectId);
 
       this.logger.info('Project added to DM', { userId, projectId });
       return { success: true };
@@ -135,6 +142,9 @@ export class ProjectsService {
         projectName: project.title || `Project ${projectId}`,
         webhookEvents: [],
       });
+
+      // Register webhook in Vikunja
+      await this.webhookRegistrationService?.ensureWebhookRegistered(projectId);
 
       this.logger.info('Project added to channel', { guildId, channelId, projectId });
       return { success: true };
