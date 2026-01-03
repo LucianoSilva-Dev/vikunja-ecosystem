@@ -14,6 +14,7 @@ export const envSchema = z.object({
   VIKUNJA_API_TOKEN: z.string().min(1, 'VIKUNJA_API_TOKEN is required'),
   VIKUNJA_WEBHOOK_SECRET: z.string().min(1, 'VIKUNJA_WEBHOOK_SECRET is required'),
   VIKUNJA_BOT_WEBHOOK_URL: z.url('VIKUNJA_BOT_WEBHOOK_URL must be a valid URL'),
+  VIKUNJA_FRONTEND_URL: z.url('VIKUNJA_FRONTEND_URL must be a valid URL'),
 
   // Database
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),

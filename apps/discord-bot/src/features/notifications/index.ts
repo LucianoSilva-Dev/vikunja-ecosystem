@@ -3,4 +3,6 @@
 
 export * from './types';
 export * from './formatters/notification.formatter';
+export * from './formatters/event-formatters';
 export * from './services/notification.service';
+export * from './services/payload-builder.service';

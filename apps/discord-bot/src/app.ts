@@ -8,11 +8,19 @@ import type { ILogger } from './shared/types';
 // Core modules
 import { createLogger } from './core/logger';
 import { createDatabase, type Database } from './core/database';
-import { createDiscordClient, registerReadyEvent, type Client } from './core/discord';
-import { createHttpServer, type FastifyInstance, type RouteRegister } from './core/http';
+import {
+  createDiscordClient,
+  registerReadyEvent,
+  type Client,
+} from './core/discord';
+import {
+  createHttpServer,
+  type FastifyInstance,
+} from './core/http';
 
 // Shared services
 import { ConfigurationRepository } from './shared/repositories/configuration.repository';
+import { UserMappingRepository } from './shared/repositories/user-mapping.repository';
 import { VikunjaApiService } from './shared/services/vikunja-api.service';
 
 // Features
@@ -37,9 +45,20 @@ import {
   ADD_PROJECT_CUSTOM_IDS,
   REMOVE_PROJECT_CUSTOM_IDS,
 } from './features/projects';
-import { NotificationService } from './features/notifications';
-import { WebhookService, WebhookRegistrationService, createWebhookRoutes, createTestWebhookRoutes } from './features/webhook';
-import { VikunjaTask, VikunjaProject, VikunjaUser } from './shared/types/vikunja.types';
+import {
+  NotificationService,
+  NotificationPayloadBuilder,
+} from './features/notifications';
+import {
+  WebhookService,
+  WebhookRegistrationService,
+  createWebhookRoutes,
+  createTestWebhookRoutes,
+} from './features/webhook';
+import type {
+  VikunjaTask,
+  VikunjaProject,
+} from './shared/types/vikunja.types';
 
 /**
  * Application container with all services
@@ -52,12 +71,14 @@ export interface App {
 
   // Services
   configRepository: ConfigurationRepository;
+  userMappingRepository: UserMappingRepository;
   vikunjaApiService: VikunjaApiService;
   setupService: SetupService;
   projectsService: ProjectsService;
   notificationService: NotificationService;
   webhookService: WebhookService;
   webhookRegistrationService: WebhookRegistrationService;
+  payloadBuilder: NotificationPayloadBuilder;
 }
 
 /**
@@ -81,6 +102,7 @@ export async function createApp(): Promise<App> {
 
   // Create shared services
   const configRepository = new ConfigurationRepository({ logger, db });
+  const userMappingRepository = new UserMappingRepository({ logger, db });
   const vikunjaApiService = new VikunjaApiService({
     logger,
     apiUrl: vikunjaConfig.apiUrl,
@@ -116,6 +138,13 @@ export async function createApp(): Promise<App> {
     webhookSecret: vikunjaConfig.webhookSecret,
   });
 
+  const payloadBuilder = new NotificationPayloadBuilder({
+    logger,
+    userMappingRepository,
+    frontendUrl: vikunjaConfig.frontendUrl,
+    vikunjaApiService,
+  });
+
   // Create Discord client
   const discordClient = createDiscordClient();
 
@@ -129,45 +158,23 @@ export async function createApp(): Promise<App> {
     projectsService,
   });
 
-  // Helper to extract common data from event
-  const extractEventData = (event: any) => {
-    let projectId: number | undefined;
-    let title = 'Untitled';
-    let description: string | undefined;
-    let author: { name: string; avatarUrl?: string } | undefined;
+  // Helper to extract projectId from event (for routing)
+  const getProjectIdFromEvent = (event: {
+    event_name: string;
+    data: unknown;
+  }): number | undefined => {
+    const data = event.data as Record<string, unknown>;
 
-    // Check for Task data (all task events have 'task' field)
-    if (event.data && typeof event.data === 'object' && 'task' in event.data) {
-      const task = event.data.task as VikunjaTask;
-      const doer = event.data.doer as VikunjaUser | undefined;
-      
-      projectId = task.project_id;
-      title = task.title;
-      description = task.description;
-      if (doer) {
-        author = {
-          name: doer.name || doer.username,
-          avatarUrl: doer.avatar_url,
-        };
-      }
-    } 
-    // Check for Project data
-    else if (event.data && typeof event.data === 'object' && 'project' in event.data) {
-      const project = event.data.project as VikunjaProject;
-      const doer = event.data.doer as VikunjaUser | undefined;
-
-      projectId = project.id;
-      title = project.title;
-      description = project.description;
-      if (doer) {
-        author = {
-          name: doer.name || doer.username,
-          avatarUrl: doer.avatar_url,
-        };
-      }
+    // Task events
+    if (data.task) {
+      return (data.task as VikunjaTask).project_id;
     }
-
-    return { projectId, title, description, author };
+    // Project events
+    if (data.project) {
+      return (data.project as VikunjaProject).id;
+    }
+    // Team events don't have projectId directly
+    return undefined;
   };
 
   // Create route registers for HTTP server
@@ -175,34 +182,48 @@ export async function createApp(): Promise<App> {
     logger,
     onWebhookReceived: async (rawPayload, signature) => {
       const event = await webhookService.processWebhook(rawPayload, signature);
-      if (event) {
-        const { projectId, title, description, author } = extractEventData(event);
-        
-        // Skip if we don't have a project ID (e.g., for deleted tasks without project info, should not happen with new structs usually)
-        if (projectId === undefined) {
-          logger.warn('Webhook event has no project ID, skipping notification', {
-            event_name: event.event_name,
-          });
-          return;
-        }
+      if (!event) return;
 
-        // Find targets and send notifications
-        const targets = await configRepository.findNotificationTargets(projectId);
+      const projectId = getProjectIdFromEvent(event);
 
-        for (const target of targets) {
-          const payload = {
-            eventType: event.event_name,
-            title: title,
-            description: description,
-            timestamp: new Date(event.time),
-            author,
-          };
+      // Skip team events for now (they don't have a project context for routing)
+      if (projectId === undefined) {
+        logger.warn('Webhook event has no project ID, skipping notification', {
+          event_name: event.event_name,
+        });
+        return;
+      }
 
-          if (target.type === 'dm') {
-            await notificationService.sendToDm(discordClient, target.targetId, payload);
-          } else {
-            await notificationService.sendToChannel(discordClient, target.targetId, payload);
-          }
+      // Build rich payload
+      const payload = await payloadBuilder.buildPayload(
+        event.event_name,
+        event.time,
+        event.data
+      );
+
+      if (!payload) {
+        logger.warn('Failed to build notification payload', {
+          event_name: event.event_name,
+        });
+        return;
+      }
+
+      // Find targets and send notifications
+      const targets = await configRepository.findNotificationTargets(projectId);
+
+      for (const target of targets) {
+        if (target.type === 'dm') {
+          await notificationService.sendToDm(
+            discordClient,
+            target.targetId,
+            payload
+          );
+        } else {
+          await notificationService.sendToChannel(
+            discordClient,
+            target.targetId,
+            payload
+          );
         }
       }
     },
@@ -212,11 +233,28 @@ export async function createApp(): Promise<App> {
   const testWebhookRouteRegister = createTestWebhookRoutes({
     logger,
     onTestEvent: async (event) => {
-      const { projectId, title, description, author } = extractEventData(event);
-      
+      const projectId = getProjectIdFromEvent(event);
+
       // Skip if we don't have a project ID
       if (projectId === undefined) {
-        logger.warn('Test webhook event has no project ID, skipping notification', {
+        logger.warn(
+          'Test webhook event has no project ID, skipping notification',
+          {
+            event_name: event.event_name,
+          }
+        );
+        return;
+      }
+
+      // Build rich payload
+      const payload = await payloadBuilder.buildPayload(
+        event.event_name,
+        event.time,
+        event.data
+      );
+
+      if (!payload) {
+        logger.warn('Failed to build test notification payload', {
           event_name: event.event_name,
         });
         return;
@@ -226,18 +264,18 @@ export async function createApp(): Promise<App> {
       const targets = await configRepository.findNotificationTargets(projectId);
 
       for (const target of targets) {
-        const payload = {
-          eventType: event.event_name,
-          title: title,
-          description: description,
-          timestamp: new Date(event.time),
-          author,
-        };
-
         if (target.type === 'dm') {
-          await notificationService.sendToDm(discordClient, target.targetId, payload);
+          await notificationService.sendToDm(
+            discordClient,
+            target.targetId,
+            payload
+          );
         } else {
-          await notificationService.sendToChannel(discordClient, target.targetId, payload);
+          await notificationService.sendToChannel(
+            discordClient,
+            target.targetId,
+            payload
+          );
         }
       }
     },
@@ -257,12 +295,14 @@ export async function createApp(): Promise<App> {
     discordClient,
     httpServer,
     configRepository,
+    userMappingRepository,
     vikunjaApiService,
     setupService,
     projectsService,
     notificationService,
     webhookService,
     webhookRegistrationService,
+    payloadBuilder,
   };
 }
 
@@ -320,17 +360,29 @@ function registerInteractionHandler(
         if (customId === 'setup_dm_project_select') {
           await handleSetupDmSelect(interaction, { logger, setupService });
         } else if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.PROJECT_SELECT)) {
-          await handleAddProjectSelect(interaction, { logger, projectsService });
+          await handleAddProjectSelect(interaction, {
+            logger,
+            projectsService,
+          });
         } else if (customId === REMOVE_PROJECT_CUSTOM_IDS.CHANNEL_SELECT) {
-          await handleRemoveChannelSelect(interaction, { logger, projectsService });
+          await handleRemoveChannelSelect(interaction, {
+            logger,
+            projectsService,
+          });
         } else if (customId === REMOVE_PROJECT_CUSTOM_IDS.PROJECT_SELECT) {
-          await handleRemoveProjectSelect(interaction, { logger, projectsService });
+          await handleRemoveProjectSelect(interaction, {
+            logger,
+            projectsService,
+          });
         }
       } else if (interaction.isChannelSelectMenu()) {
         const customId = interaction.customId;
 
         if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.CHANNEL_SELECT)) {
-          await handleAddChannelSelect(interaction, { logger, projectsService });
+          await handleAddChannelSelect(interaction, {
+            logger,
+            projectsService,
+          });
         }
       }
     } catch (error) {

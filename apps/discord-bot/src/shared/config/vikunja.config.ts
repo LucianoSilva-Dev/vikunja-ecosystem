@@ -5,6 +5,7 @@ export interface VikunjaConfig {
   apiToken: string;
   webhookSecret: string;
   webhookCallbackUrl: string;
+  frontendUrl: string;
 }
 
 export function getVikunjaConfig(): VikunjaConfig {
@@ -15,5 +16,6 @@ export function getVikunjaConfig(): VikunjaConfig {
     apiToken: env.VIKUNJA_API_TOKEN,
     webhookSecret: env.VIKUNJA_WEBHOOK_SECRET,
     webhookCallbackUrl: env.VIKUNJA_BOT_WEBHOOK_URL,
+    frontendUrl: env.VIKUNJA_FRONTEND_URL,
   };
 }
