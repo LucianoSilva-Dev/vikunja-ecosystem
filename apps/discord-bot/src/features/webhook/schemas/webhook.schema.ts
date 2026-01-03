@@ -14,11 +14,11 @@ export const webhookPayloadSchema = z.object({
  */
 export const taskDataSchema = z.object({
   id: z.number(),
-  title: z.string(),
+  title: z.string().optional().default(''),
   description: z.string().optional(),
   done: z.boolean().optional(),
   priority: z.number().optional(),
-  project_id: z.number(),
+  project_id: z.number().optional(),
   created: z.string().optional(),
   updated: z.string().optional(),
 });

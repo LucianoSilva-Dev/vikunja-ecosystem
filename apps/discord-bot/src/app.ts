@@ -39,6 +39,7 @@ import {
 } from './features/projects';
 import { NotificationService } from './features/notifications';
 import { WebhookService, createWebhookRoutes, createTestWebhookRoutes } from './features/webhook';
+import { VikunjaTask, VikunjaProject, VikunjaUser } from './shared/types/vikunja.types';
 
 /**
  * Application container with all services
@@ -118,23 +119,73 @@ export async function createApp(): Promise<App> {
     projectsService,
   });
 
+  // Helper to extract common data from event
+  const extractEventData = (event: any) => {
+    let projectId: number | undefined;
+    let title = 'Untitled';
+    let description: string | undefined;
+    let author: { name: string; avatarUrl?: string } | undefined;
+
+    // Check for Task data (all task events have 'task' field)
+    if (event.data && typeof event.data === 'object' && 'task' in event.data) {
+      const task = event.data.task as VikunjaTask;
+      const doer = event.data.doer as VikunjaUser | undefined;
+      
+      projectId = task.project_id;
+      title = task.title;
+      description = task.description;
+      if (doer) {
+        author = {
+          name: doer.name || doer.username,
+          avatarUrl: doer.avatar_url,
+        };
+      }
+    } 
+    // Check for Project data
+    else if (event.data && typeof event.data === 'object' && 'project' in event.data) {
+      const project = event.data.project as VikunjaProject;
+      const doer = event.data.doer as VikunjaUser | undefined;
+
+      projectId = project.id;
+      title = project.title;
+      description = project.description;
+      if (doer) {
+        author = {
+          name: doer.name || doer.username,
+          avatarUrl: doer.avatar_url,
+        };
+      }
+    }
+
+    return { projectId, title, description, author };
+  };
+
   // Create route registers for HTTP server
   const webhookRouteRegister = createWebhookRoutes({
     logger,
     onWebhookReceived: async (rawPayload, signature) => {
       const event = await webhookService.processWebhook(rawPayload, signature);
       if (event) {
+        const { projectId, title, description, author } = extractEventData(event);
+        
+        // Skip if we don't have a project ID (e.g., for deleted tasks without project info, should not happen with new structs usually)
+        if (projectId === undefined) {
+          logger.warn('Webhook event has no project ID, skipping notification', {
+            event_name: event.event_name,
+          });
+          return;
+        }
+
         // Find targets and send notifications
-        const targets = await configRepository.findNotificationTargets(
-          event.data.type === 'task' ? event.data.projectId : event.data.id
-        );
+        const targets = await configRepository.findNotificationTargets(projectId);
 
         for (const target of targets) {
           const payload = {
-            eventType: event.eventType,
-            title: event.data.title,
-            description: event.data.description,
-            timestamp: event.timestamp,
+            eventType: event.event_name,
+            title: title,
+            description: description,
+            timestamp: new Date(event.time),
+            author,
           };
 
           if (target.type === 'dm') {
@@ -151,17 +202,26 @@ export async function createApp(): Promise<App> {
   const testWebhookRouteRegister = createTestWebhookRoutes({
     logger,
     onTestEvent: async (event) => {
+      const { projectId, title, description, author } = extractEventData(event);
+      
+      // Skip if we don't have a project ID
+      if (projectId === undefined) {
+        logger.warn('Test webhook event has no project ID, skipping notification', {
+          event_name: event.event_name,
+        });
+        return;
+      }
+
       // Find targets and send notifications (bypasses signature validation)
-      const targets = await configRepository.findNotificationTargets(
-        event.data.type === 'task' ? event.data.projectId : event.data.id
-      );
+      const targets = await configRepository.findNotificationTargets(projectId);
 
       for (const target of targets) {
         const payload = {
-          eventType: event.eventType,
-          title: event.data.title,
-          description: event.data.description,
-          timestamp: event.timestamp,
+          eventType: event.event_name,
+          title: title,
+          description: description,
+          timestamp: new Date(event.time),
+          author,
         };
 
         if (target.type === 'dm') {

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { ILogger } from '../../../shared/types';
@@ -24,6 +24,13 @@ const errorResponseSchema = z.object({
   error: z.string(),
 });
 
+// Extend FastifyRequest to include rawBody
+declare module 'fastify' {
+  interface FastifyRequest {
+    rawBody?: Buffer;
+  }
+}
+
 /**
  * Creates webhook route registrar
  */
@@ -32,6 +39,23 @@ export function createWebhookRoutes(deps: WebhookRoutesDeps) {
     server: FastifyInstance,
     routeDeps: { logger: ILogger }
   ): void {
+    // Add a preHandler hook to capture raw body for webhook route
+    // This uses addContentTypeParser to store the raw body before Fastify parses it
+    server.addContentTypeParser(
+      'application/json',
+      { parseAs: 'buffer' },
+      (req: FastifyRequest, body: Buffer, done) => {
+        // Store raw body for HMAC signature validation
+        req.rawBody = body;
+        try {
+          const json = JSON.parse(body.toString());
+          done(null, json);
+        } catch (err) {
+          done(err as Error, undefined);
+        }
+      }
+    );
+
     server.withTypeProvider<ZodTypeProvider>().post('/webhook', {
       schema: {
         tags: ['webhook'],
@@ -46,7 +70,9 @@ export function createWebhookRoutes(deps: WebhookRoutesDeps) {
       },
       handler: async (request, reply) => {
         try {
-          const rawPayload = JSON.stringify(request.body);
+          // Use rawBody to preserve original payload for signature validation
+          // JSON.stringify(request.body) may produce different output than the original
+          const rawPayload = request.rawBody?.toString() ?? JSON.stringify(request.body);
           const signature = request.headers['x-vikunja-signature'] as
             | string
             | undefined;

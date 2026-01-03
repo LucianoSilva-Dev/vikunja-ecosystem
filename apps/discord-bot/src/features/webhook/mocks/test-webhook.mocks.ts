@@ -1,118 +1,11 @@
 import type { VikunjaEventType } from '../../../shared/types';
+import type { VikunjaTask, VikunjaProject, VikunjaUser, VikunjaLabel, VikunjaTaskAttachment } from '../../../shared/types/vikunja.types';
 import type { WebhookPayload } from '../schemas/webhook.schema';
-
-/**
- * Mock user type for assignees and created_by
- */
-interface MockUser {
-  id: number;
-  username: string;
-  email: string;
-  name: string;
-  created: string;
-  updated: string;
-}
-
-/**
- * Mock label type
- */
-interface MockLabel {
-  id: number;
-  title: string;
-  description: string;
-  hex_color: string;
-  created_by: MockUser;
-  created: string;
-  updated: string;
-}
-
-/**
- * Mock reminder type
- */
-interface MockReminder {
-  id: number;
-  reminder: string;
-  relative_period: number;
-  relative_to: string;
-}
-
-/**
- * Extended task data with all Vikunja fields
- */
-interface ExtendedTaskData {
-  id: number;
-  title: string;
-  description: string;
-  done: boolean;
-  done_at: string | null;
-  priority: number;
-  project_id: number;
-  created: string;
-  updated: string;
-
-  // Date fields
-  due_date: string | null;
-  start_date: string | null;
-  end_date: string | null;
-
-  // Status and progress
-  percent_done: number;
-  is_favorite: boolean;
-  hex_color: string;
-
-  // Repetition
-  repeat_after: number;
-  repeat_mode: number;
-
-  // Position and organization
-  identifier: string;
-  index: number;
-  bucket_id: number;
-  position: number;
-  kanban_position: number;
-
-  // Related data
-  assignees: MockUser[];
-  labels: MockLabel[];
-  reminders: MockReminder[];
-  related_tasks: Record<string, unknown[]>;
-  attachments: unknown[];
-  cover_image_attachment_id: number | null;
-
-  // User info
-  created_by: MockUser;
-}
-
-/**
- * Extended project data with all Vikunja fields
- */
-interface ExtendedProjectData {
-  id: number;
-  title: string;
-  description: string;
-  created: string;
-  updated: string;
-
-  // Additional fields
-  identifier: string;
-  hex_color: string;
-  is_archived: boolean;
-  is_favorite: boolean;
-  position: number;
-  parent_project_id: number | null;
-  default_bucket_id: number;
-  done_bucket_id: number;
-  background_information: unknown | null;
-  background_blur_hash: string;
-
-  // User info
-  owner: MockUser;
-}
 
 /**
  * Creates a mock user
  */
-function createMockUser(id: number, name: string): MockUser {
+function createMockUser(id: number, name: string): VikunjaUser {
   const now = new Date().toISOString();
   return {
     id,
@@ -121,13 +14,14 @@ function createMockUser(id: number, name: string): MockUser {
     name,
     created: now,
     updated: now,
+    avatar_url: '',
   };
 }
 
 /**
  * Creates a mock label
  */
-function createMockLabel(id: number, title: string, hexColor: string): MockLabel {
+function createMockLabel(id: number, title: string, hexColor: string): VikunjaLabel {
   const now = new Date().toISOString();
   return {
     id,
@@ -141,23 +35,9 @@ function createMockLabel(id: number, title: string, hexColor: string): MockLabel
 }
 
 /**
- * Creates a mock reminder
- */
-function createMockReminder(id: number, daysFromNow: number): MockReminder {
-  const reminderDate = new Date();
-  reminderDate.setDate(reminderDate.getDate() + daysFromNow);
-  return {
-    id,
-    reminder: reminderDate.toISOString(),
-    relative_period: -86400 * daysFromNow, // seconds
-    relative_to: 'due_date',
-  };
-}
-
-/**
  * Creates a mock task data object with all Vikunja fields
  */
-function createMockTaskData(projectId: number): ExtendedTaskData {
+function createMockTaskData(projectId: number): VikunjaTask {
   const now = new Date();
   const taskId = Math.floor(Math.random() * 10000) + 1;
   
@@ -173,16 +53,30 @@ function createMockTaskData(projectId: number): ExtendedTaskData {
   const endDate = new Date(now);
   endDate.setDate(endDate.getDate() + 5);
 
+  const mockAttachment: VikunjaTaskAttachment = {
+      id: 1,
+      task_id: taskId,
+      file: {
+          id: 1,
+          name: 'especificacao.pdf',
+          mime: 'application/pdf',
+          size: 1024000,
+      },
+      created: now.toISOString(),
+  };
+
   return {
     id: taskId,
     title: 'Tarefa de Teste - Implementar Feature',
     description: 'Esta é uma tarefa mockada completa para teste de webhook.\n\n## Objetivo\nTestar o fluxo de notificações Discord.\n\n## Critérios de Aceite\n- [ ] Notificação enviada\n- [ ] Formatação correta',
     done: false,
-    done_at: null,
+    done_at: undefined,
     priority: 3,
     project_id: projectId,
     created: now.toISOString(),
     updated: now.toISOString(),
+    is_favorite: true,
+    hex_color: '#4a90d9',
 
     // Date fields
     due_date: dueDate.toISOString(),
@@ -191,19 +85,15 @@ function createMockTaskData(projectId: number): ExtendedTaskData {
 
     // Status and progress
     percent_done: 0.25,
-    is_favorite: true,
-    hex_color: '#4a90d9',
-
-    // Repetition
     repeat_after: 0,
     repeat_mode: 0,
+    
 
     // Position and organization
     identifier: `PROJ-${taskId}`,
     index: taskId,
     bucket_id: 1,
     position: 65536,
-    kanban_position: 32768,
 
     // Assignees
     assignees: [
@@ -218,28 +108,24 @@ function createMockTaskData(projectId: number): ExtendedTaskData {
       createMockLabel(3, 'Backend', '#3498db'),
     ],
 
-    // Reminders
     reminders: [
-      createMockReminder(1, 1), // 1 day before due
-      createMockReminder(2, 3), // 3 days before due
+         {
+            id: 1,
+            reminder: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString(),
+            relative_period: -86400 * 1,
+            relative_to: 'due_date'
+         },
+         {
+            id: 2,
+            reminder: new Date(new Date().setDate(new Date().getDate() + 3)).toISOString(),
+            relative_period: -86400 * 3,
+            relative_to: 'due_date'
+         }
     ],
 
-    // Related data
     related_tasks: {},
-    attachments: [
-      {
-        id: 1,
-        task_id: taskId,
-        file: {
-          id: 1,
-          name: 'especificacao.pdf',
-          mime: 'application/pdf',
-          size: 1024000,
-        },
-        created: now.toISOString(),
-      },
-    ],
-    cover_image_attachment_id: null,
+    attachments: [mockAttachment],
+    cover_image_attachment_id: undefined,
 
     // Created by
     created_by: createMockUser(1, 'Admin User'),
@@ -249,7 +135,7 @@ function createMockTaskData(projectId: number): ExtendedTaskData {
 /**
  * Creates a mock project data object with all Vikunja fields
  */
-function createMockProjectData(projectId: number): ExtendedProjectData {
+function createMockProjectData(projectId: number): VikunjaProject {
   const now = new Date().toISOString();
   return {
     id: projectId,
@@ -257,20 +143,12 @@ function createMockProjectData(projectId: number): ExtendedProjectData {
     description: 'Este é um projeto mockado completo para teste de webhook.\n\nContém múltiplas tarefas e configurações de exemplo.',
     created: now,
     updated: now,
-
-    // Additional fields
     identifier: `PROJ`,
     hex_color: '#2ecc71',
     is_archived: false,
     is_favorite: true,
     position: 65536,
-    parent_project_id: null,
-    default_bucket_id: 1,
-    done_bucket_id: 2,
-    background_information: null,
-    background_blur_hash: '',
-
-    // Owner
+    parent_project_id: undefined,
     owner: createMockUser(1, 'Admin User'),
   };
 }
@@ -282,10 +160,12 @@ export function createMockTaskEvent(
   projectId: number,
   eventType: VikunjaEventType
 ): WebhookPayload {
+  const task = createMockTaskData(projectId);
+  const doer = createMockUser(1, 'Admin User');
   return {
     event_name: eventType,
     time: new Date().toISOString(),
-    data: createMockTaskData(projectId),
+    data: { task, doer },
   };
 }
 
@@ -296,10 +176,12 @@ export function createMockProjectEvent(
   projectId: number,
   eventType: VikunjaEventType
 ): WebhookPayload {
+  const project = createMockProjectData(projectId);
+  const doer = createMockUser(1, 'Admin User');
   return {
     event_name: eventType,
     time: new Date().toISOString(),
-    data: createMockProjectData(projectId),
+    data: { project, doer },
   };
 }
 

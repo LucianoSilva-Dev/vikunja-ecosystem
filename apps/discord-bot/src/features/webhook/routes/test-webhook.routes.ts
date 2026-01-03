@@ -1,13 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import type { ILogger, VikunjaEventType } from '../../../shared/types';
+import type { ILogger } from '../../../shared/types';
+import type { VikunjaEventType } from '../../../shared/types/vikunja.types';
+
 import {
   testWebhookRequestSchema,
   testWebhookResponseSchema,
 } from '../schemas/test-webhook.schema';
 import { createMockWebhookEvent } from '../mocks/test-webhook.mocks';
-import type { WebhookEvent, TaskEventData, ProjectEventData } from '../types';
+import type { WebhookEvent } from '../types';
 
 export interface TestWebhookRoutesDeps {
   logger: ILogger;
@@ -71,24 +73,9 @@ export function createTestWebhookRoutes(deps: TestWebhookRoutesDeps) {
 
           // Create the parsed WebhookEvent directly (bypassing signature validation)
           const parsedEvent: WebhookEvent = {
-            eventType: eventType as VikunjaEventType,
-            timestamp: new Date(mockPayload.time),
-            data: eventType.startsWith('project.')
-              ? {
-                  type: 'project' as const,
-                  id: (mockPayload.data as { id: number }).id,
-                  title: (mockPayload.data as { title: string }).title,
-                  description: (mockPayload.data as { description?: string }).description,
-                } as ProjectEventData
-              : {
-                  type: 'task' as const,
-                  id: (mockPayload.data as { id: number }).id,
-                  title: (mockPayload.data as { title: string }).title,
-                  description: (mockPayload.data as { description?: string }).description,
-                  done: (mockPayload.data as { done?: boolean }).done,
-                  priority: (mockPayload.data as { priority?: number }).priority,
-                  projectId: (mockPayload.data as { project_id: number }).project_id,
-                } as TaskEventData,
+            event_name: eventType as any,
+            time: mockPayload.time,
+            data: mockPayload.data as any,
           };
 
           // Process the event directly (bypassing signature validation)
