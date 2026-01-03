@@ -10,6 +10,7 @@ import {
   formatProgress,
   formatRelationType,
   getEventTypeLabel,
+  isValidDate,
 } from './event-formatters';
 
 /**
@@ -101,7 +102,7 @@ function addTaskContextFields(
   }
 
   // Data de vencimento
-  if (context.dueDate) {
+  if (isValidDate(context.dueDate)) {
     fields.push({
       name: '📅 Vencimento',
       value: formatDate(context.dueDate),
@@ -110,7 +111,7 @@ function addTaskContextFields(
   }
 
   // Datas de início e fim
-  if (context.startDate) {
+  if (isValidDate(context.startDate)) {
     fields.push({
       name: '🚀 Início',
       value: formatDate(context.startDate),
@@ -118,7 +119,7 @@ function addTaskContextFields(
     });
   }
 
-  if (context.endDate) {
+  if (isValidDate(context.endDate)) {
     fields.push({
       name: '🏁 Fim',
       value: formatDate(context.endDate),

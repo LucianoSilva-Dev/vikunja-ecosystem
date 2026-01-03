@@ -78,11 +78,20 @@ export function formatLabels(labels: LabelInfo[]): string {
 }
 
 /**
+ * Verifica se uma data é válida e posterior a 2015 (ano de criação do Vikunja)
+ * Isso evita exibir datas padrão como "0001-01-01"
+ */
+export function isValidDate(date?: Date): boolean {
+  if (!date) return false;
+  return date.getFullYear() >= 2015;
+}
+
+/**
  * Formata data usando timestamp do Discord (formato relativo)
  */
 export function formatDate(date?: Date): string {
-  if (!date) return 'Não definida';
-  const timestamp = Math.floor(date.getTime() / 1000);
+  if (!isValidDate(date)) return 'Não definida';
+  const timestamp = Math.floor(date!.getTime() / 1000);
   return `<t:${timestamp}:R>`; // Formato relativo: "há 2 horas"
 }
 
