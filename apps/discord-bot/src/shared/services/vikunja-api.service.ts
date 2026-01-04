@@ -4,8 +4,15 @@ import {
   getProjectsIdWebhooks,
   putProjectsIdWebhooks,
   deleteProjectsIdWebhooksWebhookID,
+  getTasksId,
+  postTasksId,
+  getProjectsIdViewsViewTasks,
+  putTasksTaskIDAssignees,
+  deleteTasksTaskIDAssigneesUserID,
   type ModelsProject,
   type ModelsWebhook,
+  type ModelsTask,
+  type ModelsTaskBody,
   postLogin,
   getUser,
 } from '@vikunja/api-client';
@@ -219,6 +226,98 @@ export class VikunjaApiService {
       return response as unknown as VikunjaUser;
     } catch (error) {
        this.logger.error('Failed to get current user', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  // ============ Task Operations ============
+
+  /**
+   * Busca uma task específica por ID
+   */
+  async getTaskById(taskId: number): Promise<ModelsTask | null> {
+    this.logger.debug('Fetching task by ID', { taskId });
+    try {
+      const response = await getTasksId(taskId, undefined, this.getRequestOptions());
+      return response;
+    } catch (error) {
+      this.logger.warn('Task not found or error fetching task', {
+        taskId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Atualiza uma task
+   */
+  async updateTask(taskId: number, updates: Partial<ModelsTaskBody>): Promise<ModelsTask> {
+    this.logger.debug('Updating task', { taskId, updates });
+    try {
+      const response = await postTasksId(taskId, updates as ModelsTaskBody, this.getRequestOptions());
+      this.logger.info('Task updated', { taskId });
+      return response;
+    } catch (error) {
+      this.logger.error('Failed to update task', {
+        taskId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Atribui um usuário a uma task
+   */
+  async assignTask(taskId: number, userId: number): Promise<void> {
+    this.logger.debug('Assigning user to task', { taskId, userId });
+    try {
+      await putTasksTaskIDAssignees(taskId, { user_id: userId }, this.getRequestOptions());
+      this.logger.info('User assigned to task', { taskId, userId });
+    } catch (error) {
+      this.logger.error('Failed to assign user to task', {
+        taskId,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Remove atribuição de um usuário de uma task
+   */
+  async unassignTask(taskId: number, userId: number): Promise<void> {
+    this.logger.debug('Unassigning user from task', { taskId, userId });
+    try {
+      await deleteTasksTaskIDAssigneesUserID(taskId, userId, this.getRequestOptions());
+      this.logger.info('User unassigned from task', { taskId, userId });
+    } catch (error) {
+      this.logger.error('Failed to unassign user from task', {
+        taskId,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Lista todas as tasks de um projeto
+   * Nota: Requer um viewId. Por padrão usamos view 0 (lista).
+   */
+  async getProjectTasks(projectId: number, viewId: number = 0): Promise<ModelsTask[]> {
+    this.logger.debug('Fetching tasks for project', { projectId, viewId });
+    try {
+      const response = await getProjectsIdViewsViewTasks(projectId, viewId, undefined, this.getRequestOptions());
+      return response || [];
+    } catch (error) {
+      this.logger.error('Failed to get project tasks', {
+        projectId,
+        viewId,
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;

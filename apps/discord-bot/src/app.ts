@@ -62,6 +62,13 @@ import {
   CONNECT_ACCOUNT_COMMAND_NAME,
   DISCONNECT_ACCOUNT_COMMAND_NAME,
 } from './features/auth';
+import {
+  createTaskActionService,
+  createTaskActionButtonHandler,
+  createTaskActionModalHandler,
+  type TaskActionButtonHandler,
+  type TaskActionModalHandler,
+} from './features/task-actions';
 import type {
   VikunjaTask,
   VikunjaProject,
@@ -162,6 +169,21 @@ export async function createApp(): Promise<App> {
   const authCommand = new AuthCommand(logger, authService);
   const authInteractionHandler = new AuthInteractionHandler(logger, authService);
 
+  // Task actions handlers
+  const taskActionService = createTaskActionService({
+    logger,
+    vikunjaApi: vikunjaApiService,
+  });
+  const taskActionButtonHandler = createTaskActionButtonHandler({
+    logger,
+    taskActionService,
+    userMappingRepository,
+  });
+  const taskActionModalHandler = createTaskActionModalHandler({
+    logger,
+    taskActionService,
+  });
+
   // Create Discord client
   const discordClient = createDiscordClient();
 
@@ -175,6 +197,8 @@ export async function createApp(): Promise<App> {
     projectsService,
     authCommand,
     authInteractionHandler,
+    taskActionButtonHandler,
+    taskActionModalHandler,
   });
 
   // Helper to extract projectId from event (for routing)
@@ -344,13 +368,23 @@ interface InteractionHandlerDeps {
   projectsService: ProjectsService;
   authCommand: AuthCommand;
   authInteractionHandler: AuthInteractionHandler;
+  taskActionButtonHandler: TaskActionButtonHandler;
+  taskActionModalHandler: TaskActionModalHandler;
 }
 
 function registerInteractionHandler(
   client: Client,
   deps: InteractionHandlerDeps
 ): void {
-  const { logger, setupService, projectsService, authCommand, authInteractionHandler } = deps;
+  const {
+    logger,
+    setupService,
+    projectsService,
+    authCommand,
+    authInteractionHandler,
+    taskActionButtonHandler,
+    taskActionModalHandler,
+  } = deps;
 
   client.on('interactionCreate', async (interaction) => {
     try {
@@ -415,7 +449,17 @@ function registerInteractionHandler(
           });
         }
       } else if (interaction.isModalSubmit()) {
-        await authInteractionHandler.handleModalSubmit(interaction);
+        // Check if it's a task action modal first
+        if (taskActionModalHandler.canHandle(interaction.customId)) {
+          await taskActionModalHandler.handle(interaction);
+        } else {
+          await authInteractionHandler.handleModalSubmit(interaction);
+        }
+      } else if (interaction.isButton()) {
+        // Handle task action buttons
+        if (taskActionButtonHandler.canHandle(interaction.customId)) {
+          await taskActionButtonHandler.handle(interaction);
+        }
       }
     } catch (error) {
       logger.error('Interaction failed', {

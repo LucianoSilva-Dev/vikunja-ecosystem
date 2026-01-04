@@ -1,4 +1,5 @@
 import type { VikunjaEventType } from '../../shared/types';
+import type { ActionRowBuilder, ButtonBuilder } from 'discord.js';
 
 /**
  * Types for the notification module
@@ -133,4 +134,7 @@ export interface NotificationPayload {
 
   color?: number;
   timestamp?: Date;
+
+  // Componentes interativos (botões)
+  components?: ActionRowBuilder<ButtonBuilder>[];
 }

@@ -1,4 +1,4 @@
-import { EmbedBuilder } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import type { VikunjaEventType } from '../../../shared/types';
 import type { NotificationPayload, TaskEventContext } from '../types';
 import {
@@ -160,10 +160,63 @@ function addTaskContextFields(
 }
 
 /**
+ * Cria os botões de ação rápida para eventos de task
+ * Retorna múltiplas rows para melhor layout (max 3 botões por linha)
+ */
+function createTaskActionButtons(
+  taskId: number,
+  _taskUrl?: string,
+  isDone?: boolean
+): ActionRowBuilder<ButtonBuilder>[] {
+  const row1 = new ActionRowBuilder<ButtonBuilder>();
+  const row2 = new ActionRowBuilder<ButtonBuilder>();
+
+  // Linha 1: 3 ações principais
+  // Botão de status é idempotente: exibe a ação com base no estado atual
+  const statusButton = isDone
+    ? new ButtonBuilder()
+        .setCustomId(`task_action:reopen:${taskId}`)
+        .setEmoji('🔄')
+        .setLabel('Reabrir')
+        .setStyle(ButtonStyle.Secondary)
+    : new ButtonBuilder()
+        .setCustomId(`task_action:mark_complete:${taskId}`)
+        .setEmoji('✅')
+        .setLabel('Concluir')
+        .setStyle(ButtonStyle.Secondary);
+
+  row1.addComponents(
+    statusButton,
+    new ButtonBuilder()
+      .setCustomId(`task_action:assign_me:${taskId}`)
+      .setEmoji('👤')
+      .setLabel('Atribuir a Mim')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(`task_action:due_date:${taskId}`)
+      .setEmoji('📅')
+      .setLabel('Due Date')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  // Linha 2: Lembrete (futura implementação)
+  row2.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`task_action:reminder:${taskId}`)
+      .setEmoji('🔔')
+      .setLabel('Lembrete')
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return [row1, row2];
+}
+
+/**
  * Formats a notification payload into a Discord message with rich embeds
  */
 export function formatNotificationMessage(payload: NotificationPayload): {
   embeds: EmbedBuilder[];
+  components?: ActionRowBuilder<ButtonBuilder>[];
 } {
   const emoji = EVENT_EMOJIS[payload.eventType] || '📌';
   const color = payload.color || EVENT_COLORS[payload.eventType] || 0x5865f2;
@@ -294,5 +347,17 @@ export function formatNotificationMessage(payload: NotificationPayload): {
 
 
 
-  return { embeds: [embed] };
+  // Componentes de ação rápida para eventos de task
+  let components: ActionRowBuilder<ButtonBuilder>[] | undefined;
+
+  if (payload.components) {
+    // Usar componentes passados diretamente
+    components = payload.components;
+  } else if (payload.context?.type === 'task') {
+    // Criar botões de ação para eventos de task
+    const taskContext = payload.context.data;
+    components = createTaskActionButtons(taskContext.taskId, payload.url, taskContext.done);
+  }
+
+  return { embeds: [embed], ...(components && { components }) };
 }
