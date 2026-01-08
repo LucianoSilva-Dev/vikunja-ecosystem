@@ -16,6 +16,7 @@ import type { ILogger } from '../../../shared/types';
 import type { TaskActionService } from '../services/task-action.service';
 import type { UserMappingRepository } from '../../../shared/repositories/user-mapping.repository';
 import { parseTaskActionCustomId, isTaskActionCustomId } from '../types';
+import { showReminderTypeSelect } from './reminder-type-select.handler';
 
 export interface TaskActionButtonHandlerDeps {
   logger: ILogger;
@@ -186,50 +187,8 @@ export class TaskActionButtonHandler {
       return;
     }
 
-    // Criar modal para configuração do lembrete
-    const modal = new ModalBuilder()
-      .setCustomId(`task_reminder_modal:${projectId}:${taskId}`)
-      .setTitle('Criar Lembrete');
-
-    const typeInput = new TextInputBuilder()
-      .setCustomId('reminder_type')
-      .setLabel('Tipo: hora, diario, semanal, cron')
-      .setPlaceholder('diario (ou cron: 0 9 * * *)')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true);
-
-    const timeInput = new TextInputBuilder()
-      .setCustomId('reminder_time')
-      .setLabel('Horário (HH:MM)')
-      .setPlaceholder('09:00')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(true)
-      .setMinLength(5)
-      .setMaxLength(5);
-
-    const startDateInput = new TextInputBuilder()
-      .setCustomId('reminder_start_date')
-      .setLabel('A partir de (DD/MM/AAAA) - opcional')
-      .setPlaceholder('Deixe vazio para começar agora')
-      .setStyle(TextInputStyle.Short)
-      .setRequired(false);
-
-    const messageInput = new TextInputBuilder()
-      .setCustomId('reminder_message')
-      .setLabel('Mensagem adicional (opcional)')
-      .setPlaceholder('Ex: Revisar antes da reunião')
-      .setStyle(TextInputStyle.Paragraph)
-      .setRequired(false)
-      .setMaxLength(500);
-
-    modal.addComponents(
-      new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(typeInput),
-      new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(timeInput),
-      new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(startDateInput),
-      new ActionRowBuilder<ModalActionRowComponentBuilder>().addComponents(messageInput)
-    );
-
-    await interaction.showModal(modal);
+    // Use the new two-step flow: first show type selection, then show type-specific modal
+    await showReminderTypeSelect(interaction, projectId, taskId);
   }
 
   private async handleDueDate(

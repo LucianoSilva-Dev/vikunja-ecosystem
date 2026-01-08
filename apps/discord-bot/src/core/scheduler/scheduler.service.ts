@@ -28,12 +28,13 @@ export class SchedulerService {
     // Cancel existing job with same ID if exists
     this.cancel(id);
 
-    const cronOptions: { timezone?: string; startAt?: Date } = {
+    const cronOptions: { timezone?: string; startAt?: string } = {
       timezone: 'America/Sao_Paulo',
     };
 
+    // Convert Date to ISO string in local time for croner
     if (options?.startsAt && options.startsAt > new Date()) {
-      cronOptions.startAt = options.startsAt;
+      cronOptions.startAt = this.formatLocalISOString(options.startsAt);
     }
 
     const job = new Cron(cronExpression, cronOptions, async () => {
@@ -75,9 +76,17 @@ export class SchedulerService {
    */
   getNextRun(cronExpression: string, startsAt?: Date): Date | null {
     try {
+      // Convert Date to ISO string in local time for croner
+      // Croner expects startAt as ISO 8601 in local time (according to timezone)
+      let startAtStr: string | undefined;
+      if (startsAt) {
+        // Format as local ISO string (without timezone offset)
+        startAtStr = this.formatLocalISOString(startsAt);
+      }
+
       const testJob = new Cron(cronExpression, {
         timezone: 'America/Sao_Paulo',
-        startAt: startsAt,
+        startAt: startAtStr,
       });
       const next = testJob.nextRun();
       testJob.stop();
@@ -85,6 +94,20 @@ export class SchedulerService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Format a Date as ISO string in local time (without timezone offset)
+   * Example: 2026-01-08T14:49:00
+   */
+  private formatLocalISOString(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
   }
 
   /**

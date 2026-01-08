@@ -79,6 +79,9 @@ import {
   TASK_COMMAND_CUSTOM_IDS,
   canHandleReminderModal,
   handleReminderModalSubmit,
+  // Reminder type select
+  canHandleReminderTypeSelect,
+  handleReminderTypeSelect,
   // Reminder
   ReminderRepository,
   createReminderService,
@@ -524,6 +527,9 @@ function registerInteractionHandler(
             userMappingRepository,
             reminderRepository,
           });
+        } else if (canHandleReminderTypeSelect(customId)) {
+          // Handle reminder type selection (first step of two-step flow)
+          await handleReminderTypeSelect(interaction, { logger });
         }
       } else if (interaction.isChannelSelectMenu()) {
         const customId = interaction.customId;

@@ -70,9 +70,20 @@ export class ReminderService {
    */
   async createReminder(input: CreateReminderInput): Promise<ReminderRecord> {
     // Calculate next run time
-    const nextRunAt = this.scheduler.getNextRun(input.cronExpression, input.startsAt);
-    if (!nextRunAt) {
-      throw new Error('Invalid cron expression');
+    // If startsAt is provided and in the future, use it directly as the first execution
+    // Otherwise, calculate based on cron expression
+    let nextRunAt: Date;
+    
+    if (input.startsAt && input.startsAt > new Date()) {
+      // Use the provided startsAt as the first execution time
+      nextRunAt = input.startsAt;
+    } else {
+      // Calculate next run from cron (for cases without startsAt or when startsAt is in the past)
+      const calculatedNext = this.scheduler.getNextRun(input.cronExpression);
+      if (!calculatedNext) {
+        throw new Error('Invalid cron expression');
+      }
+      nextRunAt = calculatedNext;
     }
 
     const data: CreateReminderData = {

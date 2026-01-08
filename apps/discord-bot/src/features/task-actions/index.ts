@@ -75,3 +75,15 @@ export {
   handleReminderModalSubmit,
   type ReminderModalHandlerDeps,
 } from './handlers/reminder-modal.handler';
+
+export {
+  REMINDER_TYPE_SELECT_CUSTOM_ID,
+  REMINDER_CONFIG_MODAL_PREFIX,
+  REMINDER_TYPES,
+  type ReminderType,
+  type ReminderTypeSelectHandlerDeps,
+  canHandleReminderTypeSelect,
+  canHandleReminderConfigModal,
+  showReminderTypeSelect,
+  handleReminderTypeSelect,
+} from './handlers/reminder-type-select.handler';
