@@ -68,7 +68,23 @@ import {
   createTaskActionModalHandler,
   type TaskActionButtonHandler,
   type TaskActionModalHandler,
+  // Command and handlers
+  TASK_COMMAND_NAME,
+  taskCommandData,
+  handleTaskCommand,
+  handleTaskProjectSelect,
+  handleTaskTaskSelect,
+  handleTaskActionSelect,
+  handleDeleteRemindersSubmit,
+  TASK_COMMAND_CUSTOM_IDS,
+  canHandleReminderModal,
+  handleReminderModalSubmit,
+  // Reminder
+  ReminderRepository,
+  createReminderService,
+  type ReminderService,
 } from './features/task-actions';
+import { createSchedulerService, type SchedulerService } from './core/scheduler';
 import type {
   VikunjaTask,
   VikunjaProject,
@@ -169,6 +185,10 @@ export async function createApp(): Promise<App> {
   const authCommand = new AuthCommand(logger, authService);
   const authInteractionHandler = new AuthInteractionHandler(logger, authService);
 
+  // Scheduler and reminder services
+  const schedulerService = createSchedulerService({ logger });
+  const reminderRepository = new ReminderRepository({ logger, db });
+
   // Task actions handlers
   const taskActionService = createTaskActionService({
     logger,
@@ -187,18 +207,37 @@ export async function createApp(): Promise<App> {
   // Create Discord client
   const discordClient = createDiscordClient();
 
-  // Register ready event
+  // Reminder service needs discordClient
+  const reminderService = createReminderService({
+    logger,
+    schedulerService,
+    reminderRepository,
+    configRepository,
+    vikunjaApiService,
+    discordClient,
+  });
+
+  // Register ready event and load reminders
   registerReadyEvent(discordClient, { logger });
+  discordClient.once('ready', async () => {
+    await reminderService.loadReminders();
+  });
 
   // Register interaction handler
   registerInteractionHandler(discordClient, {
     logger,
     setupService,
     projectsService,
+    configRepository,
+    vikunjaApiService,
+    userMappingRepository,
     authCommand,
     authInteractionHandler,
     taskActionButtonHandler,
     taskActionModalHandler,
+    taskActionService,
+    reminderService,
+    reminderRepository,
   });
 
   // Helper to extract projectId from event (for routing)
@@ -357,7 +396,7 @@ export function getCommandsData() {
   const logger = createLogger({ name: 'temp-command-loader', level: 'info' }); // Temporary logger just for definition
   // Mock AuthService for command definition extraction
   const authCommand = new AuthCommand(logger, {} as AuthService);
-  return [setupCommandData, projectsCommandData, ...authCommand.definitions];
+  return [setupCommandData, projectsCommandData, taskCommandData, ...authCommand.definitions];
 }
 
 // ============ Internal Helpers ============
@@ -366,10 +405,16 @@ interface InteractionHandlerDeps {
   logger: ILogger;
   setupService: SetupService;
   projectsService: ProjectsService;
+  configRepository: ConfigurationRepository;
+  vikunjaApiService: VikunjaApiService;
+  userMappingRepository: UserMappingRepository;
   authCommand: AuthCommand;
   authInteractionHandler: AuthInteractionHandler;
   taskActionButtonHandler: TaskActionButtonHandler;
   taskActionModalHandler: TaskActionModalHandler;
+  taskActionService: ReturnType<typeof createTaskActionService>;
+  reminderService: ReminderService;
+  reminderRepository: ReminderRepository;
 }
 
 function registerInteractionHandler(
@@ -380,10 +425,16 @@ function registerInteractionHandler(
     logger,
     setupService,
     projectsService,
+    configRepository,
+    vikunjaApiService,
+    userMappingRepository,
     authCommand,
     authInteractionHandler,
     taskActionButtonHandler,
     taskActionModalHandler,
+    taskActionService,
+    reminderService,
+    reminderRepository,
   } = deps;
 
   client.on('interactionCreate', async (interaction) => {
@@ -417,6 +468,13 @@ function registerInteractionHandler(
           commandName === DISCONNECT_ACCOUNT_COMMAND_NAME
         ) {
           await authCommand.handle(interaction);
+        } else if (commandName === TASK_COMMAND_NAME) {
+          await handleTaskCommand(interaction, {
+            logger,
+            configRepository,
+            vikunjaApiService,
+            reminderRepository,
+          });
         }
       } else if (interaction.isStringSelectMenu()) {
         const customId = interaction.customId;
@@ -438,6 +496,34 @@ function registerInteractionHandler(
             logger,
             projectsService,
           });
+        } else if (customId === TASK_COMMAND_CUSTOM_IDS.PROJECT_SELECT) {
+          await handleTaskProjectSelect(interaction, {
+            logger,
+            configRepository,
+            vikunjaApiService,
+            reminderRepository,
+          });
+        } else if (customId.startsWith(TASK_COMMAND_CUSTOM_IDS.TASK_SELECT)) {
+          await handleTaskTaskSelect(interaction, {
+            logger,
+            configRepository,
+            vikunjaApiService,
+            reminderRepository,
+          });
+        } else if (customId.startsWith(TASK_COMMAND_CUSTOM_IDS.ACTION_SELECT)) {
+          await handleTaskActionSelect(interaction, {
+            logger,
+            taskActionService,
+            userMappingRepository,
+            reminderRepository,
+          });
+        } else if (customId.startsWith('task_reminder_delete')) {
+          await handleDeleteRemindersSubmit(interaction, {
+            logger,
+            taskActionService,
+            userMappingRepository,
+            reminderRepository,
+          });
         }
       } else if (interaction.isChannelSelectMenu()) {
         const customId = interaction.customId;
@@ -449,8 +535,14 @@ function registerInteractionHandler(
           });
         }
       } else if (interaction.isModalSubmit()) {
-        // Check if it's a task action modal first
-        if (taskActionModalHandler.canHandle(interaction.customId)) {
+        // Check if it's a reminder modal
+        if (canHandleReminderModal(interaction.customId)) {
+          await handleReminderModalSubmit(interaction, {
+            logger,
+            reminderService,
+          });
+        } else if (taskActionModalHandler.canHandle(interaction.customId)) {
+          // Check if it's a task action modal (due date)
           await taskActionModalHandler.handle(interaction);
         } else {
           await authInteractionHandler.handleModalSubmit(interaction);

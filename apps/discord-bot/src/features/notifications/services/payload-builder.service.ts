@@ -239,6 +239,7 @@ export class NotificationPayloadBuilder {
     // Build task context
     const taskContext: TaskEventContext = {
       taskId: task.id,
+      projectId: task.project_id,
       taskIdentifier: this.getTaskIdentifier(task),
       priority: task.priority,
       done: task.done,

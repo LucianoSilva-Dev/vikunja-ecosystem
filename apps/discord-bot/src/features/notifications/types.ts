@@ -39,6 +39,7 @@ export interface LabelInfo {
  */
 export interface TaskEventContext {
   taskId: number;
+  projectId: number;
   taskIdentifier: string; // Ex: "PROJ-123"
   priority?: number;
   dueDate?: Date;

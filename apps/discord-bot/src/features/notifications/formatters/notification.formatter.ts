@@ -165,6 +165,7 @@ function addTaskContextFields(
  */
 function createTaskActionButtons(
   taskId: number,
+  projectId: number,
   _taskUrl?: string,
   isDone?: boolean
 ): ActionRowBuilder<ButtonBuilder>[] {
@@ -199,10 +200,10 @@ function createTaskActionButtons(
       .setStyle(ButtonStyle.Secondary)
   );
 
-  // Linha 2: Lembrete (futura implementação)
+  // Linha 2: Lembrete
   row2.addComponents(
     new ButtonBuilder()
-      .setCustomId(`task_action:reminder:${taskId}`)
+      .setCustomId(`task_action:reminder:${projectId}:${taskId}`)
       .setEmoji('🔔')
       .setLabel('Lembrete')
       .setStyle(ButtonStyle.Secondary)
@@ -356,7 +357,12 @@ export function formatNotificationMessage(payload: NotificationPayload): {
   } else if (payload.context?.type === 'task') {
     // Criar botões de ação para eventos de task
     const taskContext = payload.context.data;
-    components = createTaskActionButtons(taskContext.taskId, payload.url, taskContext.done);
+    components = createTaskActionButtons(
+      taskContext.taskId,
+      taskContext.projectId,
+      payload.url,
+      taskContext.done
+    );
   }
 
   return { embeds: [embed], ...(components && { components }) };

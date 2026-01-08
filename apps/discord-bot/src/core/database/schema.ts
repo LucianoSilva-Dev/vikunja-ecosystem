@@ -103,3 +103,23 @@ export const guildChannelBindingsRelations = relations(
     }),
   })
 );
+
+/**
+ * Lembretes de tasks
+ * Suporta cron expressions para repetição
+ */
+export const reminders = pgTable('reminders', {
+  id: serial('id').primaryKey(),
+  discordUserId: text('discord_user_id').notNull(), // Quem criou
+  vikunjaTaskId: integer('vikunja_task_id').notNull(),
+  vikunjaProjectId: integer('vikunja_project_id').notNull(),
+  targetType: text('target_type').notNull().$type<'dm' | 'guild'>(),
+  guildId: text('guild_id'), // Para guild reminders
+  cronExpression: text('cron_expression').notNull(),
+  startsAt: timestamp('starts_at'), // "A partir de" (opcional)
+  nextRunAt: timestamp('next_run_at').notNull(),
+  message: text('message'), // Mensagem customizada (opcional)
+  enabled: integer('enabled').notNull().default(1), // 1 = true, 0 = false
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+

@@ -38,6 +38,9 @@ importers:
       '@vikunja/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      croner:
+        specifier: ^9.1.0
+        version: 9.1.0
       discord.js:
         specifier: ^14.25.1
         version: 14.25.1
@@ -1417,6 +1420,10 @@ packages:
   cookie@1.1.1:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
+
+  croner@9.1.0:
+    resolution: {integrity: sha512-p9nwwR4qyT5W996vBZhdvBCnMhicY5ytZkR4D1Xj0wuTDEiMnjwR57Q3RXYY/s0EpX6Ay3vgIcfaR+ewGHsi+g==}
+    engines: {node: '>=18.0'}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -4148,6 +4155,8 @@ snapshots:
   content-type@1.0.5: {}
 
   cookie@1.1.1: {}
+
+  croner@9.1.0: {}
 
   cross-spawn@7.0.6:
     dependencies:
