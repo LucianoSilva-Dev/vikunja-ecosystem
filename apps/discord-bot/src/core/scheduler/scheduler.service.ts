@@ -34,7 +34,9 @@ export class SchedulerService {
 
     // Convert Date to ISO string in local time for croner
     if (options?.startsAt && options.startsAt > new Date()) {
-      cronOptions.startAt = this.formatLocalISOString(options.startsAt);
+      // Subtract 1 second to ensure inclusive execution if it matches exactly
+      const startAtAdjusted = new Date(options.startsAt.getTime() - 1000);
+      cronOptions.startAt = this.formatLocalISOString(startAtAdjusted);
     }
 
     const job = new Cron(cronExpression, cronOptions, async () => {

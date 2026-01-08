@@ -177,9 +177,19 @@ export class ReminderService {
       }
 
       // Update next run time
-      const nextRun = this.scheduler.getNextRun(reminder.cronExpression);
-      if (nextRun) {
-        await this.reminderRepo.updateNextRunAt(reminder.id, nextRun);
+      // Check if it's a one-time reminder (has specific day and month)
+      const cronParts = reminder.cronExpression.split(' ');
+      const isOneTime = cronParts[2] !== '*' && cronParts[3] !== '*';
+
+      if (isOneTime) {
+        this.logger.debug('Deleting one-time reminder after execution', { id: reminder.id });
+        await this.deleteReminder(reminder.id, reminder.discordUserId);
+      } else {
+        // Update next run time for recurring reminders
+        const nextRun = this.scheduler.getNextRun(reminder.cronExpression);
+        if (nextRun) {
+          await this.reminderRepo.updateNextRunAt(reminder.id, nextRun);
+        }
       }
     } catch (error) {
       this.logger.error('Failed to execute reminder', {
