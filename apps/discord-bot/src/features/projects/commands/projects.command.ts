@@ -27,13 +27,7 @@ export const projectsCommandData = new SlashCommandBuilder()
     sub
       .setName('add')
       .setDescription('Adicionar um novo projeto')
-      .addChannelOption((opt) =>
-        opt
-          .setName('channel')
-          .setDescription('Canal para associar ao projeto (apenas em servidores)')
-          .addChannelTypes(ChannelType.GuildText)
-          .setRequired(false)
-      )
+
   )
   .addSubcommand((sub) =>
     sub.setName('remove').setDescription('Remover um projeto')

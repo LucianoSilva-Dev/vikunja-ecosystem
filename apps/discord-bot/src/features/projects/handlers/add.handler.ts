@@ -6,7 +6,7 @@ import {
   StringSelectMenuOptionBuilder,
   ChannelSelectMenuBuilder,
   ChannelType,
-  type GuildTextBasedChannel,
+
 } from 'discord.js';
 import type { ProjectsService } from '../services/projects.service';
 import type { ILogger } from '../../../shared/types';
@@ -78,21 +78,12 @@ export async function handleAddProject(
   );
 
   if (isInGuild) {
-    const providedChannel = interaction.options.getChannel('channel') as GuildTextBasedChannel | null;
-
     const embed = new EmbedBuilder()
       .setTitle('➕ Adicionar Projeto')
       .setDescription(
-        providedChannel
-          ? `Selecione o projeto Vikunja para vincular ao canal <#${providedChannel.id}>.`
-          : 'Selecione o projeto Vikunja que deseja adicionar. Depois você poderá escolher o canal.'
+        'Selecione o projeto Vikunja que deseja adicionar. Depois você poderá escolher o canal.'
       )
       .setColor(0x00ae86);
-
-    // Store channel in customId if provided
-    if (providedChannel) {
-      select.setCustomId(`${ADD_PROJECT_CUSTOM_IDS.PROJECT_SELECT}:${providedChannel.id}`);
-    }
 
     await interaction.editReply({
       embeds: [embed],
@@ -101,7 +92,6 @@ export async function handleAddProject(
 
     logger.debug('Add project menu displayed', { 
       guildId: interaction.guildId,
-      providedChannelId: providedChannel?.id 
     });
   } else {
     // DM flow - same as setup dm
@@ -138,68 +128,33 @@ export async function handleAddProjectSelect(
   await interaction.deferUpdate();
 
   if (isInGuild) {
-    // Guild flow - check if channel was provided in customId
-    const [customIdBase, channelId] = interaction.customId.split(':');
+
     const projectId = parseInt(selectedIds[0], 10);
+    
+    // Always show channel select for guild
+    const channelSelect = new ChannelSelectMenuBuilder()
+      .setCustomId(`${ADD_PROJECT_CUSTOM_IDS.CHANNEL_SELECT}:${projectId}`)
+      .setPlaceholder('Selecione o canal')
+      .setChannelTypes(ChannelType.GuildText);
 
-    if (channelId) {
-      // Channel was provided, add project directly
-      const result = await projectsService.addProjectToChannel(
-        interaction.guildId!,
-        channelId,
-        projectId
-      );
+    const row = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+      channelSelect
+    );
 
-      if (!result.success) {
-        await interaction.editReply({
-          content: `❌ ${result.error}`,
-          embeds: [],
-          components: [],
-        });
-        return;
-      }
+    const embed = new EmbedBuilder()
+      .setTitle('➕ Selecione o Canal')
+      .setDescription(`Agora selecione o canal onde deseja vincular o projeto.`)
+      .setColor(0x00ae86);
 
-      const embed = new EmbedBuilder()
-        .setTitle('✅ Projeto Adicionado')
-        .setDescription(`Projeto vinculado ao canal <#${channelId}> com sucesso!`)
-        .setColor(0x00ae86);
+    await interaction.editReply({
+      embeds: [embed],
+      components: [row],
+    });
 
-      await interaction.editReply({
-        embeds: [embed],
-        components: [],
-      });
-
-      logger.info('Project added to channel via provided option', {
-        guildId: interaction.guildId,
-        channelId,
-        projectId,
-      });
-    } else {
-      // Need to select channel
-      const channelSelect = new ChannelSelectMenuBuilder()
-        .setCustomId(`${ADD_PROJECT_CUSTOM_IDS.CHANNEL_SELECT}:${projectId}`)
-        .setPlaceholder('Selecione o canal')
-        .setChannelTypes(ChannelType.GuildText);
-
-      const row = new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
-        channelSelect
-      );
-
-      const embed = new EmbedBuilder()
-        .setTitle('➕ Selecione o Canal')
-        .setDescription(`Agora selecione o canal onde deseja vincular o projeto.`)
-        .setColor(0x00ae86);
-
-      await interaction.editReply({
-        embeds: [embed],
-        components: [row],
-      });
-
-      logger.debug('Channel select menu displayed', {
-        guildId: interaction.guildId,
-        projectId,
-      });
-    }
+    logger.debug('Channel select menu displayed', {
+      guildId: interaction.guildId,
+      projectId,
+    });
   } else {
     // DM flow - add all selected projects
     const results: { projectId: number; success: boolean; error?: string }[] = [];

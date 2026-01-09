@@ -30,7 +30,7 @@ export async function handleListProjects(
 
     if (projects.length === 0) {
       embed.setDescription(
-        'Nenhum projeto configurado para este servidor ainda.\nUse `/setup guild` para configurar um canal.'
+        'Nenhum projeto configurado para este servidor ainda.\nUse `/projects add` para configurar um canal.'
       );
     } else {
       const projectList = projects

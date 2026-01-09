@@ -24,13 +24,7 @@ import { UserMappingRepository } from './shared/repositories/user-mapping.reposi
 import { VikunjaApiService } from './shared/services/vikunja-api.service';
 
 // Features
-import {
-  SetupService,
-  handleSetupDm,
-  handleSetupDmSelect,
-  setupCommandData,
-  SETUP_COMMAND_NAME,
-} from './features/setup';
+
 import {
   ProjectsService,
   handleListProjects,
@@ -109,7 +103,7 @@ export interface App {
   configRepository: ConfigurationRepository;
   userMappingRepository: UserMappingRepository;
   vikunjaApiService: VikunjaApiService;
-  setupService: SetupService;
+
   projectsService: ProjectsService;
   notificationService: NotificationService;
   webhookService: WebhookService;
@@ -154,12 +148,7 @@ export async function createApp(): Promise<App> {
     webhookSecret: vikunjaConfig.webhookSecret,
   });
 
-  const setupService = new SetupService({
-    logger,
-    configRepository,
-    vikunjaApiService,
-    webhookRegistrationService,
-  });
+
 
   const projectsService = new ProjectsService({
     logger,
@@ -233,7 +222,7 @@ export async function createApp(): Promise<App> {
   // Register interaction handler
   registerInteractionHandler(discordClient, {
     logger,
-    setupService,
+
     projectsService,
     configRepository,
     vikunjaApiService,
@@ -386,7 +375,7 @@ export async function createApp(): Promise<App> {
     configRepository,
     userMappingRepository,
     vikunjaApiService,
-    setupService,
+
     projectsService,
     notificationService,
     webhookService,
@@ -403,14 +392,15 @@ export function getCommandsData() {
   const logger = createLogger({ name: 'temp-command-loader', level: 'info' }); // Temporary logger just for definition
   // Mock AuthService for command definition extraction
   const authCommand = new AuthCommand(logger, {} as AuthService);
-  return [setupCommandData, projectsCommandData, taskCommandData, ...authCommand.definitions];
+  return [projectsCommandData, taskCommandData, ...authCommand.definitions];
 }
 
 // ============ Internal Helpers ============
 
+
 interface InteractionHandlerDeps {
   logger: ILogger;
-  setupService: SetupService;
+
   projectsService: ProjectsService;
   configRepository: ConfigurationRepository;
   vikunjaApiService: VikunjaApiService;
@@ -430,7 +420,7 @@ function registerInteractionHandler(
 ): void {
   const {
     logger,
-    setupService,
+
     projectsService,
     configRepository,
     vikunjaApiService,
@@ -449,13 +439,7 @@ function registerInteractionHandler(
       if (interaction.isChatInputCommand()) {
         const commandName = interaction.commandName;
 
-        if (commandName === SETUP_COMMAND_NAME) {
-          const subcommand = interaction.options.getSubcommand();
-
-          if (subcommand === 'dm') {
-            await handleSetupDm(interaction, { logger, setupService });
-          }
-        } else if (commandName === PROJECTS_COMMAND_NAME) {
+        if (commandName === PROJECTS_COMMAND_NAME) {
           const subcommand = interaction.options.getSubcommand();
 
           if (subcommand === 'list') {
@@ -486,9 +470,7 @@ function registerInteractionHandler(
       } else if (interaction.isStringSelectMenu()) {
         const customId = interaction.customId;
 
-        if (customId === 'setup_dm_project_select') {
-          await handleSetupDmSelect(interaction, { logger, setupService });
-        } else if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.PROJECT_SELECT)) {
+        if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.PROJECT_SELECT)) {
           await handleAddProjectSelect(interaction, {
             logger,
             projectsService,
