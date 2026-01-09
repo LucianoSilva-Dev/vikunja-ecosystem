@@ -51,7 +51,8 @@ export class ProjectsService {
    */
   async addProjectToDm(
     userId: string,
-    projectId: number
+    projectId: number,
+    events: string[] = []
   ): Promise<ProjectsResult<void>> {
     try {
       const project = await this.vikunjaApiService.getProject(projectId);
@@ -63,13 +64,13 @@ export class ProjectsService {
       await this.configRepository.addProjectToDm(userId, {
         projectId,
         projectName: project.title || `Project ${projectId}`,
-        webhookEvents: [],
+        webhookEvents: events,
       });
 
       // Register webhook in Vikunja
-      await this.webhookRegistrationService?.ensureWebhookRegistered(projectId);
+      await this.webhookRegistrationService?.ensureWebhookRegistered(projectId, events);
 
-      this.logger.info('Project added to DM', { userId, projectId });
+      this.logger.info('Project added to DM', { userId, projectId, events });
       return { success: true };
     } catch (error) {
       this.logger.error('Failed to add project to DM', {
@@ -120,6 +121,25 @@ export class ProjectsService {
     }
   }
 
+  /**
+   * Get available webhook events for a project
+   */
+  async getProjectEvents(projectId: number): Promise<ProjectsResult<string[]>> {
+    try {
+      const events = await this.vikunjaApiService.getProjectAvailableEvents(projectId);
+      return { success: true, data: events };
+    } catch (error) {
+      this.logger.error('Failed to fetch project events', {
+        projectId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return {
+        success: false,
+        error: 'Erro ao buscar eventos do projeto.',
+      };
+    }
+  }
+
   // ============ Guild Operations ============
 
   /**
@@ -128,7 +148,8 @@ export class ProjectsService {
   async addProjectToChannel(
     guildId: string,
     channelId: string,
-    projectId: number
+    projectId: number,
+    events: string[] = []
   ): Promise<ProjectsResult<void>> {
     try {
       const project = await this.vikunjaApiService.getProject(projectId);
@@ -140,13 +161,13 @@ export class ProjectsService {
       await this.configRepository.addChannelBinding(guildId, channelId, {
         projectId,
         projectName: project.title || `Project ${projectId}`,
-        webhookEvents: [],
+        webhookEvents: events,
       });
 
       // Register webhook in Vikunja
-      await this.webhookRegistrationService?.ensureWebhookRegistered(projectId);
+      await this.webhookRegistrationService?.ensureWebhookRegistered(projectId, events);
 
-      this.logger.info('Project added to channel', { guildId, channelId, projectId });
+      this.logger.info('Project added to channel', { guildId, channelId, projectId, events });
       return { success: true };
     } catch (error) {
       this.logger.error('Failed to add project to channel', {

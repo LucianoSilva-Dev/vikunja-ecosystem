@@ -5,6 +5,9 @@ export {
   handleAddProject,
   handleAddProjectSelect,
   handleAddChannelSelect,
+  handleAddEventButton,
+  handleAddEventSelectAll,
+  handleAddEventConfirm,
   ADD_PROJECT_CUSTOM_IDS,
 } from './add.handler';
 export type { AddProjectHandlerDeps } from './add.handler';

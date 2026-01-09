@@ -15,6 +15,7 @@ import {
   type ModelsTaskBody,
   postLogin,
   getUser,
+  getWebhooksEvents,
 } from '@vikunja/api-client';
 import { VikunjaUser } from '../types/vikunja.types';
 import type { ILogger } from '../types';
@@ -101,6 +102,25 @@ export class VikunjaApiService {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
+    }
+  }
+
+  /**
+   * Obtém os eventos de webhook disponíveis para um projeto específico
+   * Nota: A API do Vikunja parece expor apenas um endpoint global de eventos (/webhooks/events).
+   * Assumimos que estes eventos são válidos para projetos.
+   */
+  async getProjectAvailableEvents(_projectId: number): Promise<string[]> {
+    this.logger.debug('Fetching available webhook events (global)', { projectId: _projectId });
+    try {
+      const response = await getWebhooksEvents(this.getRequestOptions());
+      return response || [];
+    } catch (error) {
+      this.logger.error('Failed to get available events', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Fallback to empty array
+      return [];
     }
   }
 

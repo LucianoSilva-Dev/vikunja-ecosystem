@@ -239,8 +239,8 @@ export class ConfigurationRepository {
    */
   async findNotificationTargets(
     projectId: number
-  ): Promise<Array<{ type: 'dm' | 'channel'; targetId: string }>> {
-    const targets: Array<{ type: 'dm' | 'channel'; targetId: string }> = [];
+  ): Promise<Array<{ type: 'dm' | 'channel'; targetId: string; webhookEvents: string[] }>> {
+    const targets: Array<{ type: 'dm' | 'channel'; targetId: string; webhookEvents: string[] }> = [];
 
     // Buscar DMs configuradas para este projeto
     const dmBindings = await this.db.query.dmProjectBindings.findMany({
@@ -249,7 +249,11 @@ export class ConfigurationRepository {
     });
 
     for (const binding of dmBindings) {
-      targets.push({ type: 'dm', targetId: binding.dmConfig.userId });
+      targets.push({
+        type: 'dm',
+        targetId: binding.dmConfig.userId,
+        webhookEvents: binding.webhookEvents ?? [],
+      });
     }
 
     // Buscar canais configurados para este projeto
@@ -258,7 +262,11 @@ export class ConfigurationRepository {
     });
 
     for (const binding of channelBindings) {
-      targets.push({ type: 'channel', targetId: binding.channelId });
+      targets.push({
+        type: 'channel',
+        targetId: binding.channelId,
+        webhookEvents: binding.webhookEvents ?? [],
+      });
     }
 
     return targets;

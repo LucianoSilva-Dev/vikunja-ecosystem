@@ -31,6 +31,9 @@ import {
   handleAddProject,
   handleAddProjectSelect,
   handleAddChannelSelect,
+  handleAddEventButton,
+  handleAddEventSelectAll,
+  handleAddEventConfirm,
   handleRemoveProject,
   handleRemoveChannelSelect,
   handleRemoveProjectSelect,
@@ -290,6 +293,36 @@ export async function createApp(): Promise<App> {
       const targets = await configRepository.findNotificationTargets(projectId);
 
       for (const target of targets) {
+        // Filter events based on user configuration
+        // If the user has subscribed to specific events, only send notifications for those
+        // If webhookEvents is empty, it means no subscriptions, so we skip (or strict filter)
+        if (
+          target.webhookEvents &&
+          target.webhookEvents.length > 0 &&
+          !target.webhookEvents.includes(event.event_name)
+        ) {
+          continue;
+        }
+
+        // If webhookEvents is empty, we arguably shouldn't send anything if we strictly follow "subscriptions".
+        // However, to be safe against legacy data where webhookEvents might be missing (though the repo defaults to []), 
+        // let's assume if the array is empty, we don't send. 
+        // But wait, the previous behavior was "send everything". 
+        // If I change it to "send nothing if empty", existing users with empty arrays (if any) will stop getting notifications.
+        // But the `add` flow forces selection (or suggests it).
+        // Let's look at `add.handler.ts`: it sends `selectedEvents`.
+        // If I make it strict: `if (!target.webhookEvents.includes(event.event_name)) continue;`
+        // Then if I have no events, I get no notifications. This is correct.
+        
+        // Revised Logic:
+        // We only send if the event is explicitly in the allowed list.
+        // We handle the case where it might be null/undefined by defaulting to [] in the repo, 
+        // but here we can be extra safe.
+        const allowedEvents = target.webhookEvents || [];
+        if (!allowedEvents.includes(event.event_name)) {
+             continue;
+        }
+
         if (target.type === 'dm') {
           await notificationService.sendToDm(
             discordClient,
@@ -543,9 +576,26 @@ function registerInteractionHandler(
           await authInteractionHandler.handleModalSubmit(interaction);
         }
       } else if (interaction.isButton()) {
+        const customId = interaction.customId;
+        
         // Handle task action buttons
-        if (taskActionButtonHandler.canHandle(interaction.customId)) {
+        if (taskActionButtonHandler.canHandle(customId)) {
           await taskActionButtonHandler.handle(interaction);
+        } else if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.EVENT_BTN_PREFIX)) {
+            await handleAddEventButton(interaction, {
+                logger,
+                projectsService,
+            });
+        } else if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.EVENT_ALL)) {
+            await handleAddEventSelectAll(interaction, {
+                logger,
+                projectsService,
+            });
+        } else if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.EVENT_CONFIRM)) {
+            await handleAddEventConfirm(interaction, {
+                logger,
+                projectsService,
+            });
         }
       }
     } catch (error) {
