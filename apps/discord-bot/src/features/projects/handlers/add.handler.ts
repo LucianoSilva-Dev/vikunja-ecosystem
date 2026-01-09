@@ -470,6 +470,16 @@ export async function handleAddEventConfirm(
         });
     });
 
+    if (selectedEvents.length === 0) {
+        if (interaction.isRepliable()) {
+            await interaction.followUp({
+                content: '⚠️ Você deve selecionar pelo menos um evento para continuar.',
+                ephemeral: true
+            });
+        }
+        return;
+    }
+
     // Proceed to add
       if (targetId === 'dm') {
           const result = await projectsService.addProjectToDm(
