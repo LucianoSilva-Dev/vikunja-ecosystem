@@ -7,6 +7,7 @@ import type { UserReference, LabelInfo } from '../types';
 export const EVENT_TYPE_LABELS: { [K in VikunjaEventType]: string } = {
   'task.created': 'Tarefa Criada',
   'task.updated': 'Tarefa Atualizada',
+  'task.reminder': 'Lembrete',
   'task.deleted': 'Tarefa Excluída',
   'task.assignee.created': 'Responsável Adicionado',
   'task.assignee.deleted': 'Responsável Removido',

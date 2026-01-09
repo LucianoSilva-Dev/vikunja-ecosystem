@@ -119,6 +119,7 @@ export const reminders = pgTable('reminders', {
   startsAt: timestamp('starts_at'), // "A partir de" (opcional)
   nextRunAt: timestamp('next_run_at').notNull(),
   message: text('message'), // Mensagem customizada (opcional)
+  mentionType: text('mention_type').notNull().default('assignees'), // 'assignees' | 'everyone'
   enabled: integer('enabled').notNull().default(1), // 1 = true, 0 = false
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });

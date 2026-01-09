@@ -82,6 +82,9 @@ import {
   // Reminder type select
   canHandleReminderTypeSelect,
   handleReminderTypeSelect,
+  // Reminder mention select
+  canHandleReminderMentionSelect,
+  handleReminderMentionSelect,
   // Reminder
   ReminderRepository,
   createReminderService,
@@ -217,6 +220,7 @@ export async function createApp(): Promise<App> {
     reminderRepository,
     configRepository,
     vikunjaApiService,
+    userMappingRepository,
     discordClient,
   });
 
@@ -530,6 +534,9 @@ function registerInteractionHandler(
         } else if (canHandleReminderTypeSelect(customId)) {
           // Handle reminder type selection (first step of two-step flow)
           await handleReminderTypeSelect(interaction, { logger });
+        } else if (canHandleReminderMentionSelect(customId)) {
+          // Handle reminder mention selection (intermediate step)
+          await handleReminderMentionSelect(interaction, { logger });
         }
       } else if (interaction.isChannelSelectMenu()) {
         const customId = interaction.customId;

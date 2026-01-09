@@ -20,6 +20,7 @@ export interface ReminderRecord {
   startsAt: Date | null;
   nextRunAt: Date;
   message: string | null;
+  mentionType: 'assignees' | 'everyone';
   enabled: boolean;
   createdAt: Date;
 }
@@ -34,6 +35,7 @@ export interface CreateReminderData {
   startsAt?: Date;
   nextRunAt: Date;
   message?: string;
+  mentionType: 'assignees' | 'everyone';
 }
 
 export interface ReminderRepositoryDeps {
@@ -66,6 +68,7 @@ export class ReminderRepository {
         startsAt: data.startsAt || null,
         nextRunAt: data.nextRunAt,
         message: data.message || null,
+        mentionType: data.mentionType,
         enabled: 1,
       })
       .returning();
@@ -197,6 +200,7 @@ export class ReminderRepository {
       startsAt: row.startsAt,
       nextRunAt: row.nextRunAt,
       message: row.message,
+      mentionType: (row.mentionType as 'assignees' | 'everyone') || 'assignees',
       enabled: row.enabled === 1,
       createdAt: row.createdAt,
     };

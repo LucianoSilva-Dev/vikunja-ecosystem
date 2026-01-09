@@ -36,7 +36,7 @@ export async function handleReminderModalSubmit(
 ): Promise<void> {
   const { logger, reminderService } = deps;
 
-  // Parse customId: reminder_config_modal:type:projectId:taskId
+  // Parse customId: reminder_config_modal:type:projectId:taskId:mentionType
   const parts = interaction.customId.split(':');
   
   if (parts.length < 4 || parts[0] !== REMINDER_CONFIG_MODAL_PREFIX) {
@@ -50,6 +50,8 @@ export async function handleReminderModalSubmit(
   const reminderType = parts[1] as ReminderType;
   const projectId = parseInt(parts[2], 10);
   const taskId = parseInt(parts[3], 10);
+  // Default to 'assignees' if not present (legacy compatibility)
+  const mentionType = (parts[4] as 'assignees' | 'everyone') || 'assignees';
 
   if (isNaN(projectId) || isNaN(taskId) || !REMINDER_TYPES[reminderType]) {
     await interaction.reply({
@@ -186,6 +188,7 @@ export async function handleReminderModalSubmit(
       cronExpression,
       startsAt,
       message,
+      mentionType,
     });
 
     // Format response
@@ -220,7 +223,7 @@ export async function handleReminderModalSubmit(
         `✅ **Lembrete ${typeLabel} criado!**\n\n` +
         `${scheduleInfo}\n` +
         `🔔 Próxima execução: ${nextRunFormatted}\n` +
-        (targetType === 'guild' ? '📢 Será enviado no canal do projeto' : '📬 Será enviado na sua DM'),
+        (targetType === 'guild' ? `📢 Será enviado no canal do projeto (${mentionType === 'everyone' ? '@everyone' : 'apenas responsáveis'})` : '📬 Será enviado na sua DM'),
     });
 
     logger.info('Reminder created via modal', {

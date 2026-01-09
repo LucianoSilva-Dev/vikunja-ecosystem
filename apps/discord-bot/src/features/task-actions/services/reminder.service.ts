@@ -14,6 +14,10 @@ import type {
 } from '../repositories/reminder.repository';
 import type { ConfigurationRepository } from '../../../shared/repositories/configuration.repository';
 import type { VikunjaApiService } from '../../../shared/services/vikunja-api.service';
+import type { UserMappingRepository } from '../../../shared/repositories/user-mapping.repository';
+import { formatNotificationMessage } from '../../notifications/formatters/notification.formatter';
+import type { NotificationPayload, UserReference } from '../../notifications/types';
+import type { VikunjaProject } from '../../../shared/types/vikunja.types';
 
 export interface ReminderServiceDeps {
   logger: ILogger;
@@ -21,6 +25,7 @@ export interface ReminderServiceDeps {
   reminderRepository: ReminderRepository;
   configRepository: ConfigurationRepository;
   vikunjaApiService: VikunjaApiService;
+  userMappingRepository: UserMappingRepository;
   discordClient: Client;
 }
 
@@ -33,6 +38,7 @@ export interface CreateReminderInput {
   cronExpression: string;
   startsAt?: Date;
   message?: string;
+  mentionType?: 'assignees' | 'everyone';
 }
 
 export class ReminderService {
@@ -41,6 +47,7 @@ export class ReminderService {
   private readonly reminderRepo: ReminderRepository;
   private readonly configRepo: ConfigurationRepository;
   private readonly vikunjaApi: VikunjaApiService;
+  private readonly userMappingRepo: UserMappingRepository;
   private readonly discordClient: Client;
 
   constructor(deps: ReminderServiceDeps) {
@@ -49,6 +56,7 @@ export class ReminderService {
     this.reminderRepo = deps.reminderRepository;
     this.configRepo = deps.configRepository;
     this.vikunjaApi = deps.vikunjaApiService;
+    this.userMappingRepo = deps.userMappingRepository;
     this.discordClient = deps.discordClient;
   }
 
@@ -96,6 +104,7 @@ export class ReminderService {
       startsAt: input.startsAt,
       nextRunAt,
       message: input.message,
+      mentionType: input.mentionType || 'assignees',
     };
 
     const reminder = await this.reminderRepo.create(data);
@@ -159,13 +168,28 @@ export class ReminderService {
         return;
       }
 
+      // Fetch project info for better display
+      let project: VikunjaProject | undefined;
+      try {
+        const projectResult = await this.vikunjaApi.getProject(reminder.vikunjaProjectId);
+        project = (projectResult as VikunjaProject) || undefined;
+      } catch (e) {
+        this.logger.warn('Failed to fetch project for reminder', { 
+          projectId: reminder.vikunjaProjectId,
+          error: e instanceof Error ? e.message : String(e)
+        });
+      }
+
       // Build task info for embed
       const taskInfo = {
         id: task.id ?? reminder.vikunjaTaskId,
         title: task.title ?? 'Task sem título',
         project_id: task.project_id ?? reminder.vikunjaProjectId,
+        project_title: project?.title ?? 'Projeto',
+        project_identifier: project?.identifier,
         due_date: task.due_date,
         description: task.description,
+        assignees: task.assignees,
       };
 
       if (reminder.targetType === 'dm') {
@@ -201,36 +225,29 @@ export class ReminderService {
 
   private async sendDmReminder(
     discordUserId: string,
-    task: { id: number; title: string; project_id: number; due_date?: string | null; description?: string | null },
+    task: { 
+      id: number; 
+      title: string; 
+      project_id: number; 
+      project_title: string;
+      project_identifier?: string;
+      due_date?: string | null; 
+      description?: string | null;
+      assignees?: any[];
+    },
     customMessage?: string | null
   ): Promise<void> {
     try {
       const user = await this.discordClient.users.fetch(discordUserId);
+      const reminder: ReminderRecord = {
+        message: customMessage || null,
+        mentionType: 'assignees',
+      } as any; // Mock reminder record for DM
       
-      // Build reminder embed
-      const { EmbedBuilder } = await import('discord.js');
-      const embed = new EmbedBuilder()
-        .setTitle(`🔔 ${task.title}`)
-        .setURL(`${process.env.VIKUNJA_FRONTEND_URL || 'https://vikunja.io'}/tasks/${task.id}`)
-        .setColor(0xf39c12)
-        .setTimestamp();
+      const payload = await this.createNotificationPayload(task, reminder, 'dm');
+      const { embeds } = formatNotificationMessage(payload);
 
-      if (task.due_date) {
-        const dueDate = new Date(task.due_date);
-        if (dueDate.getFullYear() > 1) {
-          embed.addFields({
-            name: '📅 Prazo',
-            value: dueDate.toLocaleDateString('pt-BR'),
-            inline: true,
-          });
-        }
-      }
-
-      if (customMessage) {
-        embed.setDescription(customMessage);
-      }
-
-      await user.send({ embeds: [embed] });
+      await user.send({ embeds });
       this.logger.debug('DM reminder sent', { userId: discordUserId, taskTitle: task.title });
     } catch (error) {
       this.logger.warn('Failed to send DM reminder', {
@@ -242,7 +259,16 @@ export class ReminderService {
 
   private async sendGuildReminder(
     reminder: ReminderRecord,
-    task: { id: number; title: string; project_id: number; due_date?: string | null; description?: string | null },
+    task: { 
+      id: number; 
+      title: string; 
+      project_id: number; 
+      project_title: string;
+      project_identifier?: string;
+      due_date?: string | null; 
+      description?: string | null;
+      assignees?: any[];
+    },
     customMessage?: string | null
   ): Promise<void> {
     if (!reminder.guildId) {
@@ -266,33 +292,23 @@ export class ReminderService {
     try {
       const channel = await this.discordClient.channels.fetch(binding.channelId);
       if (channel?.isTextBased()) {
-        // Build reminder embed
-        const { EmbedBuilder } = await import('discord.js');
-        const embed = new EmbedBuilder()
-          .setTitle(`🔔 ${task.title}`)
-          .setURL(`${process.env.VIKUNJA_FRONTEND_URL || 'https://vikunja.io'}/tasks/${task.id}`)
-          .setColor(0xf39c12)
-          .setTimestamp();
+        const payload = await this.createNotificationPayload(task, reminder, 'guild');
+        const { embeds } = formatNotificationMessage(payload);
 
-        if (task.due_date) {
-          const dueDate = new Date(task.due_date);
-          if (dueDate.getFullYear() > 1) {
-            embed.addFields({
-              name: '📅 Prazo',
-              value: dueDate.toLocaleDateString('pt-BR'),
-              inline: true,
-            });
-          }
+        let content = '';
+        if (reminder.mentionType === 'everyone') {
+          content = '@everyone';
         }
 
-        if (customMessage) {
-          embed.setDescription(customMessage);
-        }
+        await (channel as TextChannel).send({
+          content: content || undefined,
+          embeds,
+        });
 
-        await (channel as TextChannel).send({ embeds: [embed] });
         this.logger.debug('Guild reminder sent', {
           channelId: binding.channelId,
           taskTitle: task.title,
+          mentionType: reminder.mentionType,
         });
       }
     } catch (error) {
@@ -301,6 +317,72 @@ export class ReminderService {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  private async createNotificationPayload(
+    task: { 
+      id: number; 
+      title: string; 
+      project_id: number; 
+      project_title: string;
+      project_identifier?: string;
+      due_date?: string | null; 
+      description?: string | null;
+      assignees?: any[]; 
+    },
+    reminder: ReminderRecord,
+    targetType: 'dm' | 'guild'
+  ): Promise<NotificationPayload> {
+    // Create a mock user for the author (Display Bot Name or "System")
+    const author: UserReference = {
+      vikunjaId: 0,
+      username: 'Lembrete',
+      name: 'Lembrete',
+    };
+
+    // Resolve assignees with Discord IDs
+    const assignees: UserReference[] = [];
+    
+    if (task.assignees && task.assignees.length > 0) {
+      for (const u of task.assignees) {
+        const discordUserId = await this.userMappingRepo.findDiscordUserId(u.id);
+        assignees.push({
+          vikunjaId: u.id,
+          username: u.username,
+          name: u.name,
+          discordUserId: discordUserId || undefined, // Include Discord ID if available
+          avatarUrl: u.avatar_url,
+        });
+      }
+    }
+
+    const frontendUrl = process.env.VIKUNJA_FRONTEND_URL || 'https://vikunja.io';
+
+    return {
+      eventType: 'task.reminder', // Use new specific event type for correct emoji/label
+      title: `Lembrete: ${task.title}`,
+      description: reminder.message || undefined,
+      timestamp: new Date(),
+      // Color is handled by formatter based on event type, but can override if needed
+      url: `${frontendUrl}/tasks/${task.id}`,
+      author,
+      project: {
+        id: task.project_id,
+        title: task.project_title,
+        identifier: task.project_identifier || 'PROJ',
+        url: `${frontendUrl}/projects/${task.project_id}`,
+      },
+      context: {
+        type: 'task',
+        data: {
+          taskId: task.id,
+          taskIdentifier: `#${task.id}`,
+          projectId: task.project_id,
+          dueDate: task.due_date ? new Date(task.due_date) : undefined,
+          assignees: assignees,
+        },
+      },
+    };
   }
 }
 

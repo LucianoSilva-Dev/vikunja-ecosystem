@@ -5,6 +5,7 @@
 export type VikunjaEventType =
   | 'task.created'
   | 'task.updated'
+  | 'task.reminder'
   | 'task.deleted'
   | 'task.assignee.created'
   | 'task.assignee.deleted'

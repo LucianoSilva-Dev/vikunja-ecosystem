@@ -1,0 +1,1 @@
+ALTER TABLE "reminders" ADD COLUMN "mention_type" text DEFAULT 'assignees' NOT NULL;

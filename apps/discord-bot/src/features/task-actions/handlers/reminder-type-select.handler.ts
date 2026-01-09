@@ -21,6 +21,7 @@ import type { ILogger } from '../../../shared/types';
 
 // Custom ID prefixes
 export const REMINDER_TYPE_SELECT_CUSTOM_ID = 'reminder_type_select';
+export const REMINDER_MENTION_SELECT_CUSTOM_ID = 'reminder_mention_select';
 export const REMINDER_CONFIG_MODAL_PREFIX = 'reminder_config_modal';
 
 /**
@@ -50,6 +51,7 @@ export const REMINDER_TYPES = {
 } as const;
 
 export type ReminderType = keyof typeof REMINDER_TYPES;
+export type MentionType = 'assignees' | 'everyone';
 
 export interface ReminderTypeSelectHandlerDeps {
   logger: ILogger;
@@ -60,6 +62,13 @@ export interface ReminderTypeSelectHandlerDeps {
  */
 export function canHandleReminderTypeSelect(customId: string): boolean {
   return customId.startsWith(`${REMINDER_TYPE_SELECT_CUSTOM_ID}:`);
+}
+
+/**
+ * Check if this handler can process the mention selection (select menu)
+ */
+export function canHandleReminderMentionSelect(customId: string): boolean {
+  return customId.startsWith(`${REMINDER_MENTION_SELECT_CUSTOM_ID}:`);
 }
 
 /**
@@ -100,7 +109,7 @@ export async function showReminderTypeSelect(
 }
 
 /**
- * Handle reminder type selection and show appropriate modal
+ * Handle reminder type selection and show appropriate modal or next step
  */
 export async function handleReminderTypeSelect(
   interaction: StringSelectMenuInteraction,
@@ -124,8 +133,67 @@ export async function handleReminderTypeSelect(
 
   logger.debug('Reminder type selected', { projectId, taskId, type: selectedType });
 
-  // Show modal based on selected type
-  const modal = createReminderConfigModal(selectedType, projectId, taskId);
+  // If in a guild, offer mention options via Dropdown
+  if (interaction.guildId) {
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`${REMINDER_MENTION_SELECT_CUSTOM_ID}:${selectedType}:${projectId}:${taskId}`)
+      .setPlaceholder('Quem deve ser mencionado?')
+      .addOptions([
+        {
+          label: 'Apenas Responsáveis',
+          description: 'Menciona apenas os usuários atribuídos à tarefa',
+          value: 'assignees',
+          emoji: '👤',
+        },
+        {
+          label: '@everyone',
+          description: 'Menciona todos no canal (@everyone)',
+          value: 'everyone',
+          emoji: '📢',
+        },
+      ]);
+
+    const row = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
+
+    await interaction.update({
+      content: '👥 **Quem devo avisar?**\nSelecione quem será mencionado no lembrete:',
+      components: [row],
+    });
+    return;
+  }
+
+  // If DM, default to assignees (which means user) and show modal
+  const modal = createReminderConfigModal(selectedType, projectId, taskId, 'assignees');
+  await interaction.showModal(modal);
+}
+
+/**
+ * Handle reminder mention selection and show modal
+ */
+export async function handleReminderMentionSelect(
+  interaction: StringSelectMenuInteraction,
+  deps: ReminderTypeSelectHandlerDeps
+): Promise<void> {
+  const { logger } = deps;
+
+  // Parse customId: reminder_mention_select:type:projectId:taskId
+  const parts = interaction.customId.split(':');
+  const reminderType = parts[1] as ReminderType;
+  const projectId = parseInt(parts[2], 10);
+  const taskId = parseInt(parts[3], 10);
+  const mentionType = interaction.values[0] as MentionType;
+
+  if (isNaN(projectId) || isNaN(taskId) || !REMINDER_TYPES[reminderType]) {
+    await interaction.reply({
+      content: '❌ Dados inválidos.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  logger.debug('Reminder mention type selected', { projectId, taskId, reminderType, mentionType });
+
+  const modal = createReminderConfigModal(reminderType, projectId, taskId, mentionType);
   await interaction.showModal(modal);
 }
 
@@ -135,11 +203,13 @@ export async function handleReminderTypeSelect(
 function createReminderConfigModal(
   type: ReminderType,
   projectId: number,
-  taskId: number
+  taskId: number,
+  mentionType: MentionType
 ): ModalBuilder {
   const typeConfig = REMINDER_TYPES[type];
+  // Encode mentionType in customId: reminder_config_modal:type:projectId:taskId:mentionType
   const modal = new ModalBuilder()
-    .setCustomId(`${REMINDER_CONFIG_MODAL_PREFIX}:${type}:${projectId}:${taskId}`)
+    .setCustomId(`${REMINDER_CONFIG_MODAL_PREFIX}:${type}:${projectId}:${taskId}:${mentionType}`)
     .setTitle(`Configurar Lembrete ${typeConfig.label}`);
 
   // Common: Time input (all types except 'once' which may have a different flow)

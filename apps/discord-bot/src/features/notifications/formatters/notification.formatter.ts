@@ -19,6 +19,7 @@ import {
 const EVENT_COLORS: { [K in VikunjaEventType]: number } = {
   'task.created': 0x22c55e, // Green
   'task.updated': 0x3b82f6, // Blue
+  'task.reminder': 0xf39c12, // Oracle/Gold
   'task.deleted': 0xef4444, // Red
   'task.assignee.created': 0x8b5cf6, // Purple
   'task.assignee.deleted': 0xef4444, // Red
@@ -46,6 +47,7 @@ const EVENT_COLORS: { [K in VikunjaEventType]: number } = {
 const EVENT_EMOJIS: { [K in VikunjaEventType]: string } = {
   'task.created': '✅',
   'task.updated': '📝',
+  'task.reminder': '🔔',
   'task.deleted': '🗑️',
   'task.assignee.created': '👤',
   'task.assignee.deleted': '🚫',

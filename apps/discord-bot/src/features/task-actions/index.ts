@@ -86,4 +86,7 @@ export {
   canHandleReminderConfigModal,
   showReminderTypeSelect,
   handleReminderTypeSelect,
+  REMINDER_MENTION_SELECT_CUSTOM_ID,
+  canHandleReminderMentionSelect,
+  handleReminderMentionSelect,
 } from './handlers/reminder-type-select.handler';
