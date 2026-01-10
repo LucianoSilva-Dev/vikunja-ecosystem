@@ -16,6 +16,7 @@ import {
   type ModalActionRowComponentBuilder,
   type ButtonInteraction,
   type ChatInputCommandInteraction,
+  InteractionReplyOptions,
 } from 'discord.js';
 import type { ILogger } from '../../../shared/types';
 

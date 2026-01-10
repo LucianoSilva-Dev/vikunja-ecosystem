@@ -86,6 +86,9 @@ import {
   ReminderRepository,
   createReminderService,
   type ReminderService,
+} from './features/task-actions';
+
+import {
   // Digest
   DigestRepository,
   DigestService,
@@ -108,7 +111,7 @@ import {
   handleDigestModalSubmit,
   canHandleDigestPrioritySelect,
   handleDigestPrioritySelect,
-} from './features/task-actions';
+} from './features/digest';
 import { createSchedulerService, type SchedulerService } from './core/scheduler';
 import type {
   VikunjaTask,

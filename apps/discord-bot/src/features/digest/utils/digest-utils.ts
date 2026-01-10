@@ -1,5 +1,8 @@
 import { EmbedBuilder } from 'discord.js';
 import type { DigestRecord } from '../repositories/digest.repository';
+import type { VikunjaApiService } from '../../../shared/services/vikunja-api.service';
+import type { ILogger } from '../../../shared/types';
+
 
 export interface DigestEmbedOptions {
     digests: DigestRecord[];
@@ -53,6 +56,7 @@ export function getPriorityEmoji(priority: number): string {
     return `${emojis[priority] || '⚪'} ${labels[priority] || 'Indefinida'}`;
 }
 
+
 export function formatCron(cron: string): string {
     const parts = cron.split(' ');
     
@@ -70,4 +74,24 @@ export function formatCron(cron: string): string {
         const dayNames = dayParts.map(d => dayMap[parseInt(d)]).filter(Boolean).join(', ');
         return `🔁 Semanal (${dayNames}) às ${time}`;
     }
+}
+
+export async function getProjectMap(
+    apiService: VikunjaApiService,
+    logger?: ILogger
+): Promise<Map<number, string>> {
+    const projectMap = new Map<number, string>();
+    try {
+        const projects = await apiService.listProjects();
+        projects.forEach(p => {
+          if (p.id) {
+            projectMap.set(p.id, p.title || `Projeto ${p.id}`);
+          }
+        });
+    } catch (e) {
+        if (logger) {
+            logger.warn('Failed to fetch projects for digest names', { error: e });
+        }
+    }
+    return projectMap;
 }

@@ -15,6 +15,17 @@ import {
   DIGEST_TYPES,
 } from './digest-type-select.handler';
 
+
+// Import shared date utils
+import {
+  calculateDefaultStartDate,
+  calculateDefaultStartDateForWeekly,
+  parseDate,
+  parseOptionalStartDate,
+  parseDaysOfWeek,
+  formatDaysOfWeek,
+} from '../../../shared/utils/date-utils';
+
 export interface DigestModalHandlerDeps {
   logger: ILogger;
   digestService: DigestService;
@@ -90,7 +101,7 @@ export async function handleDigestModalSubmit(
 
       case 'daily': {
         cronExpression = `${minute} ${hour} * * *`;
-        const userStartDate = parseOptionalStartDate(interaction, hour, minute);
+        const userStartDate = parseOptionalStartDate(interaction, 'digest_start_date', hour, minute);
         startsAt = userStartDate ?? calculateDefaultStartDate(hour, minute);
         break;
       }
@@ -110,7 +121,7 @@ export async function handleDigestModalSubmit(
         const cronDays = days.map(d => d - 1).join(',');
 
         cronExpression = `${minute} ${hour} * * ${cronDays}`;
-        const userStartDate = parseOptionalStartDate(interaction, hour, minute);
+        const userStartDate = parseOptionalStartDate(interaction, 'digest_start_date', hour, minute);
         startsAt = userStartDate ?? calculateDefaultStartDateForWeekly(hour, minute, days);
         break;
       }
@@ -127,11 +138,8 @@ export async function handleDigestModalSubmit(
         }
         
         // For custom, we use daily cron but service manages intervals (simplification)
-        // Ideally we should store start date/interval logic in service
-        // For custom, we use daily cron but service manages intervals (simplification)
-        // Ideally we should store start date/interval logic in service
         cronExpression = `${minute} ${hour} * * *`;
-        const userStartDate = parseOptionalStartDate(interaction, hour, minute);
+        const userStartDate = parseOptionalStartDate(interaction, 'digest_start_date', hour, minute);
         startsAt = userStartDate ?? calculateDefaultStartDate(hour, minute);
         break;
       }
@@ -204,103 +212,5 @@ export async function handleDigestModalSubmit(
     await interaction.editReply({
       content: '❌ Erro ao criar resumo. Tente novamente.',
     });
-  }
-}
-
-// Helpers reused from reminder-modal.handler.ts (duplicated for safety/cleanliness)
-
-
-
-function parseDaysOfWeek(daysStr: string): number[] | null {
-  const parts = daysStr.split(',').map(s => s.trim());
-  const days: number[] = [];
-
-  for (const part of parts) {
-    const day = parseInt(part, 10);
-    if (isNaN(day) || day < 1 || day > 7) return null;
-    if (!days.includes(day)) days.push(day);
-  }
-
-  if (days.length === 0) return null;
-  return days.sort((a, b) => a - b);
-}
-
-function formatDaysOfWeek(daysStr: string): string {
-  const dayNames = ['', 'Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-  const days = parseDaysOfWeek(daysStr);
-  if (!days) return daysStr;
-  
-  return days.map(d => dayNames[d]).join(', ');
-}
-
-// Date helpers
-function calculateDefaultStartDate(hour: number, minute: number): Date {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
-  
-  if (today > now) {
-    return today;
-  } else {
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow;
-  }
-}
-
-function calculateDefaultStartDateForWeekly(hour: number, minute: number, days: number[]): Date {
-  const now = new Date();
-  const currentDay = now.getDay() + 1; // 1-7
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
-  
-  const sortedDays = [...days].sort((a, b) => a - b);
-  
-  if (sortedDays.includes(currentDay)) {
-    if (hour > currentHour || (hour === currentHour && minute > currentMinute)) {
-      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0, 0);
-    }
-  }
-  
-  let daysToAdd = 1;
-  for (let i = 1; i <= 7; i++) {
-    const checkDay = ((currentDay - 1 + i) % 7) + 1; 
-    if (sortedDays.includes(checkDay)) {
-      daysToAdd = i;
-      break;
-    }
-  }
-  
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysToAdd, hour, minute, 0, 0);
-}
-
-function parseDate(dateStr: string, hour: number, minute: number): Date | null {
-  const parts = dateStr.split('/');
-  if (parts.length !== 3) return null;
-
-  const day = parseInt(parts[0], 10);
-  const month = parseInt(parts[1], 10) - 1; 
-  const year = parseInt(parts[2], 10);
-
-  if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
-  if (day < 1 || day > 31 || month < 0 || month > 11 || year < 2024) return null;
-
-  const date = new Date(year, month, day, hour, minute);
-  if (isNaN(date.getTime())) return null;
-
-  return date;
-}
-
-function parseOptionalStartDate(
-  interaction: ModalSubmitInteraction,
-  hour: number,
-  minute: number
-): Date | undefined {
-  try {
-    const startDateValue = interaction.fields.getTextInputValue('digest_start_date')?.trim();
-    if (!startDateValue) return undefined;
-    
-    return parseDate(startDateValue, hour, minute) || undefined;
-  } catch {
-    return undefined;
   }
 }

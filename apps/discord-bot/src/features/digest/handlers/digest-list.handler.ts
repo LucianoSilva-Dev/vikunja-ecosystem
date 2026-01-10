@@ -2,7 +2,7 @@ import { ChatInputCommandInteraction } from 'discord.js';
 import type { ILogger } from '../../../shared/types';
 import type { DigestService } from '../services/digest.service';
 import type { VikunjaApiService } from '../../../shared/services/vikunja-api.service';
-import { buildDigestListEmbed } from '../utils/digest-utils';
+import { buildDigestListEmbed, getProjectMap } from '../utils/digest-utils';
 
 interface DigestListDeps {
   logger: ILogger;
@@ -38,18 +38,8 @@ export async function handleDigestList(
         return;
     }
 
-    // Fetch all projects to map IDs to titles
-    let projectMap = new Map<number, string>();
-    try {
-        const projects = await vikunjaApiService.listProjects();
-        projects.forEach(p => {
-          if (p.id) {
-            projectMap.set(p.id, p.title || `Projeto ${p.id}`);
-          }
-        });
-    } catch (e) {
-        logger.warn('Failed to fetch projects for digest list names', { error: e });
-    }
+    // Fetch project map
+    const projectMap = await getProjectMap(vikunjaApiService, logger);
 
     const embed = buildDigestListEmbed({
         digests,

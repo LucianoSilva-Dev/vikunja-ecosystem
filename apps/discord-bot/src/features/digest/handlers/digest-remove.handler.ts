@@ -10,7 +10,7 @@ import {
   import type { ILogger } from '../../../shared/types';
   import type { DigestService } from '../services/digest.service';
   import type { VikunjaApiService } from '../../../shared/services/vikunja-api.service';
-  import { buildDigestListEmbed } from '../utils/digest-utils';
+  import { buildDigestListEmbed, getProjectMap } from '../utils/digest-utils';
   
   export const DIGEST_REMOVE_IDS = {
       TOGGLE_PREFIX: 'digest_rm_toggle_',
@@ -51,15 +51,7 @@ import {
       }
   
       // Fetch all projects
-      let projectMap = new Map<number, string>();
-      try {
-          const projects = await vikunjaApiService.listProjects();
-          projects.forEach(p => {
-             if (p.id) projectMap.set(p.id, p.title || `Projeto ${p.id}`);
-          });
-      } catch (e) {
-          logger.warn('Failed to fetch projects for digest remove names', { error: e });
-      }
+      const projectMap = await getProjectMap(vikunjaApiService, logger);
   
       const embed = buildDigestListEmbed({
           digests,
