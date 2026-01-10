@@ -29,7 +29,7 @@ export function buildDigestListEmbed(options: DigestEmbedOptions): EmbedBuilder 
         const projectUrl = `${frontendUrl}/projects/${d.vikunjaProjectId}`;
         
         const priorityLabel = getPriorityEmoji(d.minPriority);
-        const frequency = formatCron(d.cronExpression);
+        const frequency = formatDigestSchedule(d);
         const nextRun = d.nextRunAt 
             ? d.nextRunAt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) 
             : 'Desconhecido';
@@ -57,23 +57,33 @@ export function getPriorityEmoji(priority: number): string {
 }
 
 
-export function formatCron(cron: string): string {
-    const parts = cron.split(' ');
-    
-    if (parts.length < 5) return `\`${cron}\``;
 
-    const [minute, hour, _day, _month, days] = parts;
+export function formatDigestSchedule(digest: DigestRecord): string {
+    const { type, typeData, cronExpression } = digest;
+    const parts = cronExpression.split(' ');
+    
+    if (parts.length < 5) return `\`${cronExpression}\``;
+
+    const [minute, hour] = parts;
     const time = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
 
-    if (days === '*') {
-        return `🔁 Todos os dias às ${time}`;
-    } else {
-        const dayMap = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-        
-        const dayParts = days.split(',');
-        const dayNames = dayParts.map(d => dayMap[parseInt(d)]).filter(Boolean).join(', ');
-        return `🔁 Semanal (${dayNames}) às ${time}`;
+    if (type === 'daily') {
+         return `🔁 Todos os dias às ${time}`;
+    } else if (type === 'weekly') {
+        const days = typeData?.days as number[] | undefined;
+        if (days && days.length > 0) {
+             const dayMap = ['', 'Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+             const dayNames = days.map(d => dayMap[d]).join(', ');
+             return `🔁 Semanal (${dayNames}) às ${time}`;
+        }
+        // Fallback if data missing but weekly
+        return `🔁 Semanal às ${time}`;
+    } else if (type === 'custom') {
+        const interval = typeData?.interval;
+        return `🔁 A cada ${interval || '?'} dias às ${time}`;
     }
+
+    return `\`${cronExpression}\``;
 }
 
 export async function getProjectMap(

@@ -10,9 +10,9 @@ import type { ILogger } from '../../../shared/types';
 import type { DigestService } from '../services/digest.service';
 import {
   DIGEST_CONFIG_MODAL_PREFIX,
-  canHandleDigestConfigModal,
-  type DigestType,
   DIGEST_TYPES,
+  DigestType,
+  canHandleDigestConfigModal,
 } from './digest-type-select.handler';
 
 
@@ -150,6 +150,17 @@ export async function handleDigestModalSubmit(
     }
 
     // Create digest
+    let typeData: any = undefined;
+
+    if (digestType === 'weekly') {
+        const daysValue = interaction.fields.getTextInputValue('digest_days').trim();
+        const days = parseDaysOfWeek(daysValue);
+        typeData = { days };
+    } else if (digestType === 'custom') {
+        const intervalValue = interaction.fields.getTextInputValue('digest_interval').trim();
+        typeData = { interval: parseInt(intervalValue, 10) };
+    }
+
     const digest = await digestService.createDigest({
       discordUserId: interaction.user.id,
       vikunjaProjectId: projectId,
@@ -157,7 +168,8 @@ export async function handleDigestModalSubmit(
       guildId: interaction.guildId || undefined,
       channelId,
       cronExpression,
-
+      type: digestType,
+      typeData,
       minPriority,
       startsAt,
     });

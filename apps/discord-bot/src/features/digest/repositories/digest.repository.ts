@@ -17,6 +17,8 @@ export interface DigestRecord {
   guildId: string | null;
   channelId: string | null;
   cronExpression: string;
+  type: 'daily' | 'weekly' | 'custom';
+  typeData: any;
   minPriority: number;
   nextRunAt: Date;
   enabled: boolean;
@@ -30,6 +32,8 @@ export interface CreateDigestData {
   guildId?: string;
   channelId?: string;
   cronExpression: string;
+  type: 'daily' | 'weekly' | 'custom';
+  typeData?: any;
   minPriority: number;
   nextRunAt: Date;
 }
@@ -61,6 +65,8 @@ export class DigestRepository {
         guildId: data.guildId || null,
         channelId: data.channelId || null,
         cronExpression: data.cronExpression,
+        type: data.type,
+        typeData: data.typeData,
         minPriority: data.minPriority,
         nextRunAt: data.nextRunAt,
         enabled: 1,
@@ -143,6 +149,8 @@ export class DigestRepository {
       guildId: row.guildId,
       channelId: row.channelId,
       cronExpression: row.cronExpression,
+      type: row.type as 'daily' | 'weekly' | 'custom',
+      typeData: row.typeData,
       minPriority: row.minPriority,
       nextRunAt: row.nextRunAt,
       enabled: row.enabled === 1,

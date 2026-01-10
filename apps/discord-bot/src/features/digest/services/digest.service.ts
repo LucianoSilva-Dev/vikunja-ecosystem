@@ -36,6 +36,8 @@ export interface CreateDigestInput {
   guildId?: string;
   channelId?: string;
   cronExpression: string;
+  type: 'daily' | 'weekly' | 'custom';
+  typeData?: any;
   minPriority: number;
   startsAt?: Date;
 }
@@ -88,6 +90,8 @@ export class DigestService {
       guildId: input.guildId,
       channelId: input.channelId,
       cronExpression: input.cronExpression,
+      type: input.type,
+      typeData: input.typeData,
       minPriority: input.minPriority,
       nextRunAt,
     };
@@ -137,7 +141,16 @@ export class DigestService {
    * Execute a digest - send summary
    */
   private async executeDigest(digest: DigestRecord): Promise<void> {
-    this.logger.debug('Executing digest', { id: digest.id, projectId: digest.vikunjaProjectId });
+    this.logger.debug('Executing digest check', { id: digest.id, projectId: digest.vikunjaProjectId });
+
+    if (!this.shouldExecute(digest)) {
+         this.logger.debug('Skipping digest execution - not due yet', { 
+             id: digest.id, 
+             nextRun: digest.nextRunAt, 
+             now: new Date() 
+         });
+         return;
+    }
 
     try {
       // 1. Fetch Project
@@ -283,7 +296,7 @@ export class DigestService {
       }
 
       // 7. Update Next Run
-      const nextRun = this.scheduler.getNextRun(digest.cronExpression);
+      const nextRun = this.calculateNextRun(digest);
       if (nextRun) {
         await this.digestRepo.updateNextRunAt(digest.id, nextRun);
       }
@@ -294,6 +307,55 @@ export class DigestService {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  private calculateNextRun(digest: DigestRecord): Date | null {
+      // Logic for custom intervals:
+      // If Custom and we just ran, we need to add X days to the *current exec time* (or next scheduled)
+      // Standard croner might just give tomorrow if cron is "daily".
+      
+      if (digest.type === 'custom' && digest.typeData?.interval) {
+          const interval = parseInt(digest.typeData.interval, 10);
+          if (!isNaN(interval)) {
+              // Add interval days to current nextRunAt (which is now 'past' or 'now')
+              const next = new Date(digest.nextRunAt);
+              next.setDate(next.getDate() + interval);
+              return next;
+          }
+      }
+
+      return this.scheduler.getNextRun(digest.cronExpression);
+  }
+
+  /**
+   * Check if we should execute the digest based on custom logic (e.g. interval check)
+   * This handles the case where cron fires daily but we only want every X days.
+   */
+  private shouldExecute(digest: DigestRecord): boolean {
+      if (digest.type !== 'custom') return true;
+      
+      const now = new Date();
+      // Allow execution if we are past or at nextRunAt (with small buffer)
+      // But actually, the scheduler triggers this callback generally at the right time.
+      // The issue is if we use a Daily cron for a 3-day interval, we need to skip the days in between?
+      // NO.
+      // Strategy:
+      // 1. We schedule the job using standard cron.
+      // 2. For custom, we calculate the REAL next date and store in DB.
+      // 3. The scheduler runs the job based on cron.
+      // 4. We check if now >= nextRunAt. If not, we skip.
+      
+      // WAIT. If we use cron `0 9 * * *` it runs EVERY day.
+      // If we want it to run every 3 days, we either:
+      // A) Use a clever cron (limitations)
+      // B) Let it run every day, but `executeDigest` checks DB `nextRunAt` and aborts if too early.
+      
+      // Implementation B:
+      if (now < digest.nextRunAt) {
+          // It's too early. This is a "daily check" execution that shouldn't send anything.
+          return false;
+      }
+      return true;
   }
 
   private getPriorityLabel(priority: number): string {

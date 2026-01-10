@@ -135,6 +135,8 @@ export const digests = pgTable('digests', {
   guildId: text('guild_id'),
   channelId: text('channel_id'),
   cronExpression: text('cron_expression').notNull(),
+  type: text('type').notNull().default('daily'), // 'daily', 'weekly', 'custom'
+  typeData: jsonb('type_data'), // { interval: number } or { days: number[] }
   minPriority: integer('min_priority').notNull().default(0),
   nextRunAt: timestamp('next_run_at').notNull(),
   enabled: integer('enabled').notNull().default(1),
