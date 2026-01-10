@@ -86,6 +86,28 @@ import {
   ReminderRepository,
   createReminderService,
   type ReminderService,
+  // Digest
+  DigestRepository,
+  DigestService,
+  createDigestService,
+  createDigestRepository,
+  DIGEST_COMMAND_NAME,
+  digestCommandData,
+  DIGEST_CUSTOM_IDS,
+  handleDigestAdd,
+  handleDigestList,
+  handleDigestRemove,
+  handleDigestProjectSelect,
+  handleDigestChannelSelect,
+  handleDigestRemoveInteraction,
+  DIGEST_REMOVE_IDS,
+  // New Digest Handlers
+  canHandleDigestTypeSelect,
+  handleDigestTypeSelect,
+  canHandleDigestModal,
+  handleDigestModalSubmit,
+  canHandleDigestPrioritySelect,
+  handleDigestPrioritySelect,
 } from './features/task-actions';
 import { createSchedulerService, type SchedulerService } from './core/scheduler';
 import type {
@@ -113,6 +135,8 @@ export interface App {
   webhookRegistrationService: WebhookRegistrationService;
   payloadBuilder: NotificationPayloadBuilder;
   authService: AuthService;
+  reminderService: ReminderService;
+  digestService: DigestService;
 }
 
 /**
@@ -186,6 +210,7 @@ export async function createApp(): Promise<App> {
   // Scheduler and reminder services
   const schedulerService = createSchedulerService({ logger });
   const reminderRepository = new ReminderRepository({ logger, db });
+  const digestRepository = new DigestRepository({ logger, db });
 
   // Task actions handlers
   const taskActionService = createTaskActionService({
@@ -216,10 +241,21 @@ export async function createApp(): Promise<App> {
     discordClient,
   });
 
+  const digestService = createDigestService({
+    logger,
+    schedulerService,
+    digestRepository,
+    configRepository,
+    vikunjaApiService,
+    userMappingRepository,
+    discordClient,
+  });
+
   // Register ready event and load reminders
   registerReadyEvent(discordClient, { logger });
   discordClient.once('ready', async () => {
     await reminderService.loadReminders();
+    await digestService.loadDigests();
   });
 
   // Register interaction handler
@@ -237,6 +273,8 @@ export async function createApp(): Promise<App> {
     taskActionService,
     reminderService,
     reminderRepository,
+    digestService,
+    digestRepository,
   });
 
   // Helper to extract projectId from event (for routing)
@@ -295,29 +333,6 @@ export async function createApp(): Promise<App> {
       for (const target of targets) {
         // Filter events based on user configuration
         // If the user has subscribed to specific events, only send notifications for those
-        // If webhookEvents is empty, it means no subscriptions, so we skip (or strict filter)
-        if (
-          target.webhookEvents &&
-          target.webhookEvents.length > 0 &&
-          !target.webhookEvents.includes(event.event_name)
-        ) {
-          continue;
-        }
-
-        // If webhookEvents is empty, we arguably shouldn't send anything if we strictly follow "subscriptions".
-        // However, to be safe against legacy data where webhookEvents might be missing (though the repo defaults to []), 
-        // let's assume if the array is empty, we don't send. 
-        // But wait, the previous behavior was "send everything". 
-        // If I change it to "send nothing if empty", existing users with empty arrays (if any) will stop getting notifications.
-        // But the `add` flow forces selection (or suggests it).
-        // Let's look at `add.handler.ts`: it sends `selectedEvents`.
-        // If I make it strict: `if (!target.webhookEvents.includes(event.event_name)) continue;`
-        // Then if I have no events, I get no notifications. This is correct.
-        
-        // Revised Logic:
-        // We only send if the event is explicitly in the allowed list.
-        // We handle the case where it might be null/undefined by defaulting to [] in the repo, 
-        // but here we can be extra safe.
         const allowedEvents = target.webhookEvents || [];
         if (!allowedEvents.includes(event.event_name)) {
              continue;
@@ -415,6 +430,8 @@ export async function createApp(): Promise<App> {
     webhookRegistrationService,
     payloadBuilder,
     authService,
+    reminderService,
+    digestService,
   };
 }
 
@@ -425,7 +442,7 @@ export function getCommandsData() {
   const logger = createLogger({ name: 'temp-command-loader', level: 'info' }); // Temporary logger just for definition
   // Mock AuthService for command definition extraction
   const authCommand = new AuthCommand(logger, {} as AuthService);
-  return [projectsCommandData, taskCommandData, ...authCommand.definitions];
+  return [projectsCommandData, taskCommandData, digestCommandData, ...authCommand.definitions];
 }
 
 // ============ Internal Helpers ============
@@ -445,6 +462,8 @@ interface InteractionHandlerDeps {
   taskActionService: ReturnType<typeof createTaskActionService>;
   reminderService: ReminderService;
   reminderRepository: ReminderRepository;
+  digestService: DigestService;
+  digestRepository: DigestRepository;
 }
 
 function registerInteractionHandler(
@@ -465,6 +484,8 @@ function registerInteractionHandler(
     taskActionService,
     reminderService,
     reminderRepository,
+    digestService,
+    digestRepository,
   } = deps;
 
   client.on('interactionCreate', async (interaction) => {
@@ -499,11 +520,24 @@ function registerInteractionHandler(
             vikunjaApiService,
             reminderRepository,
           });
+        } else if (commandName === DIGEST_COMMAND_NAME) {
+          const subcommand = interaction.options.getSubcommand();
+          if (subcommand === 'add') {
+             await handleDigestAdd(interaction, { logger, userMappingRepository, vikunjaApiService });
+          } else if (subcommand === 'list') {
+             await handleDigestList(interaction, { logger, digestService, vikunjaApiService });
+          } else if (subcommand === 'remove') {
+             await handleDigestRemove(interaction, { logger, digestService, vikunjaApiService });
+          }
         }
       } else if (interaction.isStringSelectMenu()) {
         const customId = interaction.customId;
 
-        if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.PROJECT_SELECT)) {
+        if (customId === DIGEST_CUSTOM_IDS.PROJECT_SELECT) {
+            await handleDigestProjectSelect(interaction, { logger, userMappingRepository, vikunjaApiService });
+        } else if (canHandleDigestTypeSelect(customId)) {
+            await handleDigestTypeSelect(interaction, { logger });
+        } else if (customId.startsWith(ADD_PROJECT_CUSTOM_IDS.PROJECT_SELECT)) {
           await handleAddProjectSelect(interaction, {
             logger,
             projectsService,
@@ -552,6 +586,8 @@ function registerInteractionHandler(
         } else if (canHandleReminderMentionSelect(customId)) {
           // Handle reminder mention selection (intermediate step)
           await handleReminderMentionSelect(interaction, { logger });
+        } else if (canHandleDigestPrioritySelect(customId)) {
+          await handleDigestPrioritySelect(interaction, { logger });
         }
       } else if (interaction.isChannelSelectMenu()) {
         const customId = interaction.customId;
@@ -561,6 +597,8 @@ function registerInteractionHandler(
             logger,
             projectsService,
           });
+        } else if (customId.startsWith('digest_channel_select')) {
+            await handleDigestChannelSelect(interaction, { logger, userMappingRepository, vikunjaApiService });
         }
       } else if (interaction.isModalSubmit()) {
         // Check if it's a reminder modal
@@ -572,6 +610,13 @@ function registerInteractionHandler(
         } else if (taskActionModalHandler.canHandle(interaction.customId)) {
           // Check if it's a task action modal (due date)
           await taskActionModalHandler.handle(interaction);
+        } else if (interaction.customId.startsWith('digest_create_modal')) {
+             // Basic redirect for legacy/fallback if needed, but we use canHandleDigestModal
+             if (canHandleDigestModal(interaction.customId)) {
+                await handleDigestModalSubmit(interaction, { logger, digestService });
+             }
+        } else if (canHandleDigestModal(interaction.customId)) {
+             await handleDigestModalSubmit(interaction, { logger, digestService });
         } else {
           await authInteractionHandler.handleModalSubmit(interaction);
         }
@@ -596,6 +641,12 @@ function registerInteractionHandler(
                 logger,
                 projectsService,
             });
+        } else if (
+            customId.startsWith(DIGEST_REMOVE_IDS.TOGGLE_PREFIX) || 
+            customId === DIGEST_REMOVE_IDS.CONFIRM || 
+            customId === DIGEST_REMOVE_IDS.CANCEL
+        ) {
+            await handleDigestRemoveInteraction(interaction, { logger, digestService, vikunjaApiService });
         }
       }
     } catch (error) {

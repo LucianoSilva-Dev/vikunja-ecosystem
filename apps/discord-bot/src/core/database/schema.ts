@@ -124,3 +124,19 @@ export const reminders = pgTable('reminders', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+/**
+ * Resumos de tarefas (Digests)
+ */
+export const digests = pgTable('digests', {
+  id: serial('id').primaryKey(),
+  discordUserId: text('discord_user_id').notNull(),
+  vikunjaProjectId: integer('vikunja_project_id').notNull(),
+  targetType: text('target_type').notNull().$type<'dm' | 'guild'>(),
+  guildId: text('guild_id'),
+  channelId: text('channel_id'),
+  cronExpression: text('cron_expression').notNull(),
+  minPriority: integer('min_priority').notNull().default(0),
+  nextRunAt: timestamp('next_run_at').notNull(),
+  enabled: integer('enabled').notNull().default(1),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
